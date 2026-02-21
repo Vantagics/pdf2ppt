@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 转 PPTX 转换器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            /* Wails window drag */
+            --wails-draggable: drag;
+        }
+
+        .container {
+            --wails-draggable: no-drag;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            padding: 32px;
+            width: 480px;
+            max-width: 90vw;
+        }
+
+        h1 {
+            font-size: 20px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 24px;
+            color: #1a1a1a;
+        }
+
+        .section {
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, opacity 0.2s;
+            width: 100%;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #e8ecf1;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #dce1e8;
+        }
+
+        .btn-primary {
+            background: #4a90d9;
+            color: #fff;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #3a7bc8;
+        }
+
+        .btn-link {
+            background: none;
+            color: #4a90d9;
+            padding: 6px 0;
+            width: auto;
+        }
+
+        .btn-link:hover {
+            text-decoration: underline;
+        }
+
+        .file-info {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        .file-path {
+            font-size: 12px;
+            color: #888;
+            word-break: break-all;
+        }
+
+        .progress-section {
+            margin-bottom: 16px;
+        }
+
+        .progress-bar-bg {
+            background: #e8ecf1;
+            border-radius: 6px;
+            height: 12px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: #4a90d9;
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        .result-section {
+            text-align: center;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .result-section.success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+        }
+
+        .result-section.error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+        }
+
+        .result-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .result-msg {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF 转 PPTX 转换器</h1>
+
+        <!-- 文件选择区域 -->
+        <div class="section">
+            <button id="btn-select" class="btn btn-secondary" onclick="selectFile()">
+                📂 选择文件
+            </button>
+        </div>
+
+        <!-- 文件信息显示 -->
+        <div id="file-info" class="file-info" style="display: none;">
+            <div class="file-name" id="file-name"></div>
+            <div class="file-path" id="file-path"></div>
+        </div>
+
+        <!-- 转换按钮 -->
+        <div class="section">
+            <button id="btn-convert" class="btn btn-primary" onclick="startConvert()" disabled>
+                🔄 开始转换
+            </button>
+        </div>
+
+        <!-- 进度条 -->
+        <div id="progress-section" class="progress-section" style="display: none;">
+            <div class="progress-bar-bg">
+                <div id="progress-bar" class="progress-bar" style="width: 0%;"></div>
+            </div>
+            <div id="progress-text" class="progress-text">准备中...</div>
+        </div>
+
+        <!-- 成功提示 -->
+        <div id="success-section" class="result-section success" style="display: none;">
+            <div class="result-icon">✅</div>
+            <div class="result-msg">转换完成！</div>
+            <button class="btn btn-link" onclick="openOutputDir()">📁 打开文件目录</button>
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="error-section" class="result-section error" style="display: none;">
+            <div class="result-icon">❌</div>
+            <div class="result-msg" id="error-msg">转换失败</div>
+        </div>
+    </div>
+
+    <script src="src/main.js"></script>
+</body>
+</html>

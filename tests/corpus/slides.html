@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: 13.333in 7.5in; margin: 0; }
+  html, body { margin: 0; padding: 0; }
+  .slide { width: 13.333in; height: 7.5in; page-break-after: always; position: relative; overflow: hidden; }
+  .g { background: linear-gradient(120deg, #1a365d 0%, #e74c3c 55%, #f1c40f 100%); color: white; }
+  h1 { font-family: "Liberation Sans", sans-serif; font-size: 54px; margin: 0.6in 0.7in; }
+  .rot { position: absolute; left: 7.2in; top: 3.2in; font-size: 28px; font-family: "Liberation Sans", sans-serif;
+         transform: rotate(-18deg); background: rgba(255,255,255,0.92); color: #1a365d; padding: 8px 16px; }
+  .card { position: absolute; left: 0.7in; top: 2.4in; width: 4.2in; height: 2.2in; background: #fff; color: #1a365d;
+          border-radius: 28px; font-family: "Liberation Sans", sans-serif; font-size: 22px; padding: 18px; }
+  .cjk { position: absolute; left: 0.7in; bottom: 0.6in; font-family: "WenQuanYi Micro Hei", sans-serif; font-size: 26px; }
+  .cols { column-count: 2; column-gap: 0.4in; font-size: 16px; width: 6in; position: absolute; right: 0.6in; top: 0.5in; font-family: "Liberation Serif", serif; }
+  table { border-collapse: collapse; position: absolute; left: 0.7in; top: 2in; font-family: "Liberation Sans", sans-serif; }
+  td, th { border: 1px solid #1a365d; padding: 8px 18px; font-size: 18px; }
+  th { background: #1a365d; color: white; }
+</style>
+</head>
+<body>
+  <section class="slide g">
+    <h1>Chrome / Skia print</h1>
+    <div class="card">Rounded card<br>with a gradient behind it</div>
+    <div class="rot">Rotated −18°</div>
+    <div class="cjk">中文：季度报告与嵌入字体</div>
+  </section>
+  <section class="slide" style="background:#f4f7fb">
+    <h1 style="color:#1a365d">Two columns and a table</h1>
+    <table>
+      <tr><th>Region</th><th>数量</th><th>Status</th></tr>
+      <tr><td>North</td><td>120</td><td>Ahead</td></tr>
+      <tr><td>华东</td><td>64</td><td>Watch</td></tr>
+    </table>
+    <div class="cols" style="color:#222">
+      <p>Left column discusses the quarterly result and why the chart was drawn as vectors rather than a picture.</p>
+      <p>Right column continues the sentence so a multi-column magazine layout is actually present on this page.</p>
+    </div>
+  </section>
+</body>
+</html>

@@ -26,6 +26,7 @@ type Page struct {
 	Height        float64
 	HasBackground bool
 	BgR, BgG, BgB uint8
+	BgGradient    *Gradient
 	Elements      []PageElement
 	// TextObjects and Images mirror Elements for callers that scan by type.
 	TextObjects []*TextObject
@@ -53,6 +54,7 @@ type TextObject struct {
 	Y        float64
 	Width    float64
 	Height   float64
+	Rotation float64 // clockwise degrees, matching DrawingML
 }
 
 // ImageObject is a raster image placed on the page.
@@ -73,6 +75,18 @@ type PathOp struct {
 	X2, Y2 float64
 }
 
+// GradStop is one color stop. Pos is 0..1 along the axis.
+type GradStop struct {
+	Pos     float64
+	R, G, B uint8
+}
+
+// Gradient is an axial blend recovered from a PDF shading pattern.
+type Gradient struct {
+	Angle float64 // clockwise degrees, for DrawingML
+	Stops []GradStop
+}
+
 // ShapeObject is a filled and/or stroked path.
 type ShapeObject struct {
 	X, Y, Width, Height       float64
@@ -85,6 +99,7 @@ type ShapeObject struct {
 	EvenOdd                   bool
 	SimpleRect                bool
 	Path                      []PathOp
+	Gradient                  *Gradient
 }
 
 // Open reads and validates a PDF file.

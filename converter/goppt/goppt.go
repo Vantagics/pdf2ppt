@@ -20,6 +20,7 @@ type Slide struct {
 	Height        int64 // Height in EMU
 	HasBackground bool
 	BgR, BgG, BgB uint8
+	BgGradient    *Gradient
 	Elements      []Element
 }
 
@@ -38,10 +39,11 @@ type TextBox struct {
 	ColorB   uint8
 	Bold     bool
 	Italic   bool
-	X        int64 // Position X in EMU
-	Y        int64 // Position Y in EMU
-	Width    int64 // Width in EMU
-	Height   int64 // Height in EMU
+	X        int64   // Position X in EMU
+	Y        int64   // Position Y in EMU
+	Width    int64   // Width in EMU
+	Height   int64   // Height in EMU
+	Rotation float64 // clockwise degrees
 }
 
 // PathOp is a shape-local path command. Coordinates are EMU, y grows down.
@@ -64,6 +66,19 @@ type Shape struct {
 	EvenOdd                   bool
 	SimpleRect                bool
 	Path                      []PathOp
+	Gradient                  *Gradient
+}
+
+// GradientStop is one color of a linear gradient. Pos is 0..1.
+type GradientStop struct {
+	Pos     float64
+	R, G, B uint8
+}
+
+// Gradient is a linear fill.
+type Gradient struct {
+	Angle float64
+	Stops []GradientStop
 }
 
 func (t *TextBox) elementType() string { return "textbox" }
@@ -131,6 +146,12 @@ func (s *Slide) SetBackground(r, g, b uint8) {
 	s.BgR, s.BgG, s.BgB = r, g, b
 }
 
+// SetGradientBackground sets a linear slide background.
+func (s *Slide) SetGradientBackground(g *Gradient) {
+	s.HasBackground = true
+	s.BgGradient = g
+}
+
 // AddShape adds a vector shape to the slide.
 func (s *Slide) AddShape(sh *Shape) error {
 	if sh == nil {
@@ -175,6 +196,21 @@ func (s *Slide) Images() []*Image {
 		}
 	}
 	return result
+}
+
+// slideSize is the largest page. OOXML stores one slide size; using the
+// maximum keeps a later, larger page from being clipped.
+func (p *Presentation) slideSize() (int64, int64) {
+	var w, h int64
+	for _, s := range p.slides {
+		if s.Width > w {
+			w = s.Width
+		}
+		if s.Height > h {
+			h = s.Height
+		}
+	}
+	return w, h
 }
 
 // Save writes the presentation to a PPTX file at the given path.

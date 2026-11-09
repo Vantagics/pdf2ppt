@@ -10,6 +10,7 @@ import (
 
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
+	"golang.org/x/text/encoding/charmap"
 )
 
 var subsetPrefix = regexp.MustCompile(`^[A-Z]{6}\+`)
@@ -62,6 +63,7 @@ type pdfFont struct {
 	descent  float64 // fraction of em, positive
 	codeLen  int
 	toUni    map[uint64]string
+	enc      map[byte]string // WinAnsi, MacRoman, or an encoding dictionary
 	widths   map[int]float64 // glyph width in 1000ths of em, keyed by char code
 	defWidth float64
 }
@@ -84,13 +86,7 @@ func (f *pdfFont) decodeBytes(raw []byte, fontSize, charSp, wordSp, hScale float
 		for k := 0; k < step; k++ {
 			code = code<<8 | uint64(raw[i+k])
 		}
-		s := ""
-		if f.toUni != nil {
-			s = f.toUni[code]
-		}
-		if s == "" && step == 1 && raw[i] >= 32 && raw[i] < 127 {
-			s = string(rune(raw[i]))
-		}
+		s := f.unicode(code, raw[i])
 		var ch rune
 		if rs := []rune(s); len(rs) == 1 {
 			ch = rs[0]
@@ -99,6 +95,130 @@ func (f *pdfFont) decodeBytes(raw []byte, fontSize, charSp, wordSp, hScale float
 		b.WriteString(s)
 	}
 	return b.String(), adv
+}
+
+func charmapTable(cm *charmap.Charmap) map[byte]string {
+	out := make(map[byte]string, 256)
+	for i := 0; i < 256; i++ {
+		r := cm.DecodeByte(byte(i))
+		if r == '\uFFFD' || r == 0 {
+			continue
+		}
+		out[byte(i)] = string(r)
+	}
+	return out
+}
+
+// glyphName maps the Adobe names PowerPoint and other producers put in
+// /Encoding /Differences arrays onto Unicode.
+var glyphName = map[string]string{
+	"space": " ", "exclam": "!", "quotedbl": "\"", "numbersign": "#", "dollar": "$",
+	"percent": "%", "ampersand": "&", "quotesingle": "'", "parenleft": "(", "parenright": ")",
+	"asterisk": "*", "plus": "+", "comma": ",", "hyphen": "-", "period": ".", "slash": "/",
+	"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+	"six": "6", "seven": "7", "eight": "8", "nine": "9", "colon": ":", "semicolon": ";",
+	"less": "<", "equal": "=", "greater": ">", "question": "?", "at": "@",
+	"bracketleft": "[", "backslash": "\\", "bracketright": "]", "asciicircum": "^", "underscore": "_",
+	"grave": "`", "braceleft": "{", "bar": "|", "braceright": "}", "asciitilde": "~",
+	"bullet": "•", "periodcentered": "·", "dotaccent": "˙", "dieresis": "¨", "ring": "˚",
+	"cedilla": "¸", "hungarumlaut": "˝", "ogonek": "˛", "caron": "ˇ", "breve": "˘",
+	"emdash": "—", "endash": "–", "quotedblleft": "“", "quotedblright": "”",
+	"quoteleft": "‘", "quoteright": "’", "guilsinglleft": "‹", "guilsinglright": "›",
+	"fi": "ﬁ", "fl": "ﬂ", "ellipsis": "…", "trademark": "™", "copyright": "©", "registered": "®",
+	"degree": "°", "plusminus": "±", "multiply": "×", "divide": "÷", "minus": "−",
+	"Agrave": "À", "Aacute": "Á", "Acircumflex": "Â", "Atilde": "Ã", "Adieresis": "Ä", "Aring": "Å",
+	"AE": "Æ", "Ccedilla": "Ç", "Egrave": "È", "Eacute": "É", "Ecircumflex": "Ê", "Edieresis": "Ë",
+	"Igrave": "Ì", "Iacute": "Í", "Icircumflex": "Î", "Idieresis": "Ï", "Eth": "Ð", "Ntilde": "Ñ",
+	"Ograve": "Ò", "Oacute": "Ó", "Ocircumflex": "Ô", "Otilde": "Õ", "Odieresis": "Ö",
+	"Oslash": "Ø", "Ugrave": "Ù", "Uacute": "Ú", "Ucircumflex": "Û", "Udieresis": "Ü", "Yacute": "Ý",
+	"Thorn": "Þ", "germandbls": "ß",
+	"agrave": "à", "aacute": "á", "acircumflex": "â", "atilde": "ã", "adieresis": "ä", "aring": "å",
+	"ae": "æ", "ccedilla": "ç", "egrave": "è", "eacute": "é", "ecircumflex": "ê", "edieresis": "ë",
+	"igrave": "ì", "iacute": "í", "icircumflex": "î", "idieresis": "ï", "eth": "ð", "ntilde": "ñ",
+	"ograve": "ò", "oacute": "ó", "ocircumflex": "ô", "otilde": "õ", "odieresis": "ö",
+	"oslash": "ø", "ugrave": "ù", "uacute": "ú", "ucircumflex": "û", "udieresis": "ü", "yacute": "ý",
+	"thorn": "þ", "ydieresis": "ÿ",
+	"lslash": "ł", "Lslash": "Ł", "oe": "œ", "OE": "Œ", "scaron": "š", "Scaron": "Š",
+	"zcaron": "ž", "Zcaron": "Ž", "dotlessi": "ı",
+}
+
+func standardEncoding() map[byte]string {
+	// PDF StandardEncoding is close to MacRoman for the letters we care about;
+	// WinAnsi covers the same Latin-1 repertoire producers actually emit.
+	return charmapTable(charmap.Windows1252)
+}
+
+func encodingFromDict(xrd *model.XRefTable, d types.Dict) map[byte]string {
+	base := charmapTable(charmap.Windows1252)
+	if n := d.NameEntry("BaseEncoding"); n != nil {
+		switch *n {
+		case "MacRomanEncoding":
+			base = charmapTable(charmap.Macintosh)
+		case "StandardEncoding":
+			base = standardEncoding()
+		case "WinAnsiEncoding":
+			base = charmapTable(charmap.Windows1252)
+		}
+	}
+	diffs := d.ArrayEntry("Differences")
+	if diffs == nil {
+		if o, ok := d.Find("Differences"); ok {
+			if a, err := xrd.DereferenceArray(o); err == nil {
+				diffs = a
+			}
+		}
+	}
+	code := 0
+	for _, el := range diffs {
+		el, _ = xrd.Dereference(el)
+		switch v := el.(type) {
+		case types.Integer:
+			code = int(v)
+		case types.Name:
+			if s := glyphToUnicode(v.Value()); s != "" {
+				base[byte(code)] = s
+			}
+			code++
+		}
+	}
+	return base
+}
+
+func glyphToUnicode(name string) string {
+	if s, ok := glyphName[name]; ok {
+		return s
+	}
+	if len(name) == 1 {
+		return name
+	}
+	if strings.HasPrefix(name, "uni") && len(name) == 7 {
+		if n, err := hex.DecodeString(name[3:]); err == nil && len(n) == 2 {
+			return string(rune(uint16(n[0])<<8 | uint16(n[1])))
+		}
+	}
+	return ""
+}
+
+func (f *pdfFont) unicode(code uint64, first byte) string {
+	if f != nil && f.toUni != nil {
+		if s := f.toUni[code]; s != "" {
+			return s
+		}
+	}
+	if f != nil && f.enc != nil && code < 256 {
+		if s := f.enc[byte(code)]; s != "" {
+			return s
+		}
+	}
+	if code >= 32 && code < 127 {
+		return string(rune(code))
+	}
+	// Latin-1 is a safe last resort for unmarked single-byte fonts.
+	if f != nil && f.codeLen <= 1 && code >= 160 && code <= 255 {
+		return string(rune(code))
+	}
+	_ = first
+	return ""
 }
 
 func (f *pdfFont) widthOf(code int) float64 {
@@ -201,8 +321,21 @@ func parseFont(xrd *model.XRefTable, obj types.Object) *pdfFont {
 	if bf := d.NameEntry("BaseFont"); bf != nil {
 		f.family, f.bold, f.italic = normalizeFontName(*bf)
 	}
-	if enc := d.NameEntry("Encoding"); enc != nil && (*enc == "Identity-H" || *enc == "Identity-V") {
-		f.codeLen = 2
+	if enc := d.NameEntry("Encoding"); enc != nil {
+		switch *enc {
+		case "Identity-H", "Identity-V":
+			f.codeLen = 2
+		case "WinAnsiEncoding":
+			f.enc = charmapTable(charmap.Windows1252)
+		case "MacRomanEncoding":
+			f.enc = charmapTable(charmap.Macintosh)
+		case "StandardEncoding":
+			f.enc = standardEncoding()
+		}
+	} else if o, ok := d.Find("Encoding"); ok {
+		if ed, err := xrd.DereferenceDict(o); err == nil && ed != nil {
+			f.enc = encodingFromDict(xrd, ed)
+		}
 	}
 	if o, ok := d.Find("ToUnicode"); ok {
 		applyToUnicode(xrd, o, f)

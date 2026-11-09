@@ -56,6 +56,7 @@ type gstate struct {
 	fillN, strokeN         int
 	lineWidth              float64
 	fillAlpha, strokeAlpha float64
+	fillGrad               *Gradient
 	fontName               string
 	fontSize               float64
 	charSp, wordSp, hScale float64
@@ -285,6 +286,7 @@ type interp struct {
 	seenContent      bool
 	hasBg            bool
 	bg               color3
+	bgGrad           *Gradient
 	elements         []PageElement
 	formDepth        int
 }
@@ -311,6 +313,7 @@ func interpretPage(content []byte, res *resources, originX, originY, width, heig
 	}
 	if ip.hasBg {
 		page.BgR, page.BgG, page.BgB = ip.bg.bytes()
+		page.BgGradient = ip.bgGrad
 	}
 	for _, el := range ip.elements {
 		if el.Text != nil {
@@ -373,6 +376,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		gray := pop1(st)
 		ip.gs.fill = color3{gray, gray, gray}
 		ip.gs.fillN = 1
+		ip.gs.fillGrad = nil
 	case "G":
 		gray := pop1(st)
 		ip.gs.stroke = color3{gray, gray, gray}
@@ -381,6 +385,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		b, g, r := popN3(st)
 		ip.gs.fill = color3{r, g, b}
 		ip.gs.fillN = 3
+		ip.gs.fillGrad = nil
 	case "RG":
 		b, g, r := popN3(st)
 		ip.gs.stroke = color3{r, g, b}
@@ -399,8 +404,14 @@ func (ip *interp) exec(op string, st *[]token) {
 	case "CS":
 		name := popName(st)
 		ip.gs.strokeN = csComponents(name)
-	case "sc", "scn":
+	case "sc":
 		ip.popColor(st, ip.gs.fillN, true)
+	case "scn":
+		if len(*st) > 0 && (*st)[len(*st)-1].kind == tkName {
+			ip.gs.fillGrad = ip.res.axialPattern(popName(st), ip.gs.ctm)
+		} else {
+			ip.popColor(st, ip.gs.fillN, true)
+		}
 	case "SC", "SCN":
 		ip.popColor(st, ip.gs.strokeN, false)
 	case "m":
@@ -628,7 +639,12 @@ func (ip *interp) paint(fill, stroke, evenOdd bool) {
 	if !ok {
 		return
 	}
-	if fill && !ip.seenContent && ip.coversPage(minX, minY, maxX, maxY) && !hasCurve(ops) {
+	if fill && ip.gs.fillGrad != nil && !ip.seenContent && ip.coversPage(minX, minY, maxX, maxY) && !hasCurve(ops) {
+		ip.hasBg = true
+		ip.bgGrad = ip.gs.fillGrad
+		return
+	}
+	if fill && ip.gs.fillGrad == nil && !ip.seenContent && ip.coversPage(minX, minY, maxX, maxY) && !hasCurve(ops) {
 		ip.hasBg = true
 		ip.bg = ip.gs.fill
 		return
@@ -679,6 +695,7 @@ func (ip *interp) paint(fill, stroke, evenOdd bool) {
 	}
 	if fill {
 		sh.FillR, sh.FillG, sh.FillB = ip.gs.fill.bytes()
+		sh.Gradient = ip.gs.fillGrad
 	}
 	if stroke {
 		sh.StrokeR, sh.StrokeG, sh.StrokeB = ip.gs.stroke.bytes()
@@ -932,21 +949,214 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		height = eff * 1.15
 	}
 	yTop := (ip.originY + ip.pageH) - (by + baselineFromTop*eff)
+	xLeft := bx - ip.originX
+	rot := textRotation(ip.tm, ip.gs.ctm)
+	if math.Abs(rot) > 0.4 {
+		// DrawingML rotates the box around its center. Shift the unrotated
+		// top-left so the baseline origin stays on the PDF point.
+		base := baselineFromTop * eff
+		vx, vy := -width/2, base-height/2
+		// The offset uses the same clockwise angle DrawingML applies.
+		// Empirically the y-down clockwise matrix matches OOXML when the
+		// angle is the value written to rot.
+		a := rot * math.Pi / 180
+		cos, sin := math.Cos(a), math.Sin(a)
+		// y-down, clockwise: x' = x cos - y sin, y' = x sin + y cos.
+		ox := vx*cos - vy*sin
+		oy := vx*sin + vy*cos
+		baselineY := (ip.originY + ip.pageH) - by
+		cx := xLeft - ox
+		cy := baselineY - oy
+		xLeft = cx - width/2
+		yTop = cy - height/2
+	}
 	tb := &TextObject{
 		Content:  text,
 		FontName: family,
 		FontSize: eff,
 		Bold:     bold,
 		Italic:   italic,
-		X:        bx - ip.originX,
+		X:        xLeft,
 		Y:        yTop,
 		Width:    width,
 		Height:   height,
+		Rotation: rot,
 	}
 	tb.ColorR, tb.ColorG, tb.ColorB = ip.gs.fill.bytes()
 	ip.seenContent = true
 	ip.elements = append(ip.elements, PageElement{Text: tb})
 	ip.advance(textAdv)
+}
+
+// textRotation returns clockwise degrees for DrawingML. PDF's text matrix
+// angle is counterclockwise in a y-up space, which is the opposite direction.
+func (r *resources) axialPattern(name string, ctm matrix) *Gradient {
+	if r == nil || name == "" {
+		return nil
+	}
+	pd := r.sub("Pattern")
+	if pd == nil {
+		if r.parent != nil {
+			return r.parent.axialPattern(name, ctm)
+		}
+		return nil
+	}
+	o, ok := pd.Find(name)
+	if !ok {
+		if r.parent != nil {
+			return r.parent.axialPattern(name, ctm)
+		}
+		return nil
+	}
+	d, err := r.xrd.DereferenceDict(o)
+	if err != nil || d == nil {
+		return nil
+	}
+	// PatternType 2 is a shading pattern.
+	if intEntry(r.xrd, d, "PatternType") != 2 {
+		return nil
+	}
+	shObj, ok := d.Find("Shading")
+	if !ok {
+		return nil
+	}
+	sh, err := r.xrd.DereferenceDict(shObj)
+	if err != nil || sh == nil || intEntry(r.xrd, sh, "ShadingType") != 2 {
+		return nil
+	}
+	coords := sh.ArrayEntry("Coords")
+	if len(coords) < 4 {
+		return nil
+	}
+	nums := make([]float64, 4)
+	for i := 0; i < 4; i++ {
+		n, ok := objNum(r.xrd, coords[i])
+		if !ok {
+			return nil
+		}
+		nums[i] = n
+	}
+	pm := ident()
+	if m := d.ArrayEntry("Matrix"); len(m) == 6 {
+		okm := true
+		var mm [6]float64
+		for i := 0; i < 6; i++ {
+			n, ok := objNum(r.xrd, m[i])
+			if !ok {
+				okm = false
+				break
+			}
+			mm[i] = n
+		}
+		if okm {
+			pm = matrix{mm[0], mm[1], mm[2], mm[3], mm[4], mm[5]}
+		}
+	}
+	x0, y0 := ctm.apply(pm.apply(nums[0], nums[1]))
+	x1, y1 := ctm.apply(pm.apply(nums[2], nums[3]))
+	ang := math.Atan2(y1-y0, x1-x0) * 180 / math.Pi
+	// DrawingML angles are clockwise; PDF is counterclockwise, y-up.
+	clockwise := -ang
+	for clockwise < 0 {
+		clockwise += 360
+	}
+	stops := shadingStops(r.xrd, sh)
+	if len(stops) < 2 {
+		return nil
+	}
+	return &Gradient{Angle: clockwise, Stops: stops}
+}
+
+func shadingStops(xrd *model.XRefTable, sh types.Dict) []GradStop {
+	o, ok := sh.Find("Function")
+	if !ok {
+		return nil
+	}
+	fn, err := xrd.DereferenceDict(o)
+	if err != nil || fn == nil {
+		return nil
+	}
+	if intEntry(xrd, fn, "FunctionType") == 2 {
+		c0 := rgbArray(xrd, fn, "C0")
+		c1 := rgbArray(xrd, fn, "C1")
+		if c0 == nil || c1 == nil {
+			return nil
+		}
+		return []GradStop{{0, c0[0], c0[1], c0[2]}, {1, c1[0], c1[1], c1[2]}}
+	}
+	if intEntry(xrd, fn, "FunctionType") != 3 {
+		return nil
+	}
+	subs := fn.ArrayEntry("Functions")
+	bounds := fn.ArrayEntry("Bounds")
+	if len(subs) == 0 {
+		return nil
+	}
+	var stops []GradStop
+	pos := 0.0
+	for i, sub := range subs {
+		sd, err := xrd.DereferenceDict(sub)
+		if err != nil || sd == nil {
+			continue
+		}
+		c0 := rgbArray(xrd, sd, "C0")
+		c1 := rgbArray(xrd, sd, "C1")
+		if c0 == nil || c1 == nil {
+			continue
+		}
+		if len(stops) == 0 {
+			stops = append(stops, GradStop{0, c0[0], c0[1], c0[2]})
+		}
+		end := 1.0
+		if i < len(bounds) {
+			if n, ok := objNum(xrd, bounds[i]); ok {
+				end = n
+			}
+		}
+		stops = append(stops, GradStop{end, c1[0], c1[1], c1[2]})
+		pos = end
+		_ = pos
+	}
+	return stops
+}
+
+func rgbArray(xrd *model.XRefTable, d types.Dict, key string) *[3]uint8 {
+	o, ok := d.Find(key)
+	if !ok {
+		return nil
+	}
+	arr, err := xrd.DereferenceArray(o)
+	if err != nil || len(arr) < 3 {
+		return nil
+	}
+	var out [3]uint8
+	for i := 0; i < 3; i++ {
+		n, ok := objNum(xrd, arr[i])
+		if !ok {
+			return nil
+		}
+		out[i] = toByte(n)
+	}
+	return &out
+}
+
+func textRotation(tm, ctm matrix) float64 {
+	dx, dy := tm.applyVec(1, 0)
+	px, py := ctm.applyVec(dx, dy)
+	if math.Hypot(px, py) < 1e-6 {
+		return 0
+	}
+	deg := math.Atan2(py, px) * 180 / math.Pi
+	for deg > 180 {
+		deg -= 360
+	}
+	for deg < -180 {
+		deg += 360
+	}
+	if math.Abs(deg) < 0.5 {
+		return 0
+	}
+	return -deg
 }
 
 func (ip *interp) effectiveSize() float64 {

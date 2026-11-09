@@ -1,6 +1,10 @@
 package gopdf2
 
-import "testing"
+import (
+	"testing"
+
+	"golang.org/x/text/encoding/charmap"
+)
 
 func TestNormalizeFontName(t *testing.T) {
 	cases := []struct {
@@ -39,6 +43,21 @@ func TestToUnicodeAndAdvance(t *testing.T) {
 	// (500/1000)*10 + (1000/1000)*10 = 15
 	if adv < 14.9 || adv > 15.1 {
 		t.Fatalf("advance %v", adv)
+	}
+}
+
+func TestWinAnsiAccent(t *testing.T) {
+	f := &pdfFont{
+		codeLen:  1,
+		toUni:    map[uint64]string{},
+		enc:      charmapTable(charmap.Windows1252),
+		widths:   map[int]float64{},
+		defWidth: 500,
+	}
+	// WinAnsi: E0 à, E8 è, E9 é, ED í, F3 ó
+	s, _ := f.decodeBytes([]byte{0xE0, 0xE8, 0xE9, 0xED, 0xF3}, 12, 0, 0, 100)
+	if s != "àèéíó" {
+		t.Fatalf("got %q", s)
 	}
 }
 

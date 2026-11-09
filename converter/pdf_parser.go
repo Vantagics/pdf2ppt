@@ -69,6 +69,7 @@ func (p *PDFParser) ExtractPageContent(pageNum int) (*PageContent, error) {
 		BgR:           page.BgR,
 		BgG:           page.BgG,
 		BgB:           page.BgB,
+		BgGradient:    gradientFromPDF(page.BgGradient),
 		Elements:      make([]PageElement, 0, len(page.Elements)),
 		TextElements:  make([]TextElement, 0, len(page.TextObjects)),
 		ImageElements: make([]ImageElement, 0, len(page.Images)),
@@ -118,6 +119,7 @@ func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 		Y:        textObj.Y,
 		Width:    textObj.Width,
 		Height:   textObj.Height,
+		Rotation: textObj.Rotation,
 		FontName: textObj.FontName,
 		FontSize: textObj.FontSize,
 	}
@@ -163,7 +165,19 @@ func shapeFromPDF(sh *gopdf2.ShapeObject) ShapeElement {
 			Op: op.Op, X: op.X, Y: op.Y, X1: op.X1, Y1: op.Y1, X2: op.X2, Y2: op.Y2,
 		})
 	}
+	elem.Gradient = gradientFromPDF(sh.Gradient)
 	return elem
+}
+
+func gradientFromPDF(g *gopdf2.Gradient) *GradientFill {
+	if g == nil || len(g.Stops) == 0 {
+		return nil
+	}
+	out := &GradientFill{Angle: g.Angle}
+	for _, s := range g.Stops {
+		out.Stops = append(out.Stops, GradientStop{Pos: s.Pos, R: s.R, G: s.G, B: s.B})
+	}
+	return out
 }
 
 // Close 关闭 PDF 文档，释放资源

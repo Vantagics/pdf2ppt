@@ -32,7 +32,13 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 	heightEMU := PointsToEMU(content.PageHeight)
 
 	slide := g.ppt.AddSlide(widthEMU, heightEMU)
-	if content.HasBackground {
+	if content.BgGradient != nil && len(content.BgGradient.Stops) >= 2 {
+		g := &goppt.Gradient{Angle: content.BgGradient.Angle}
+		for _, s := range content.BgGradient.Stops {
+			g.Stops = append(g.Stops, goppt.GradientStop{Pos: s.Pos, R: s.R, G: s.G, B: s.B})
+		}
+		slide.SetGradientBackground(g)
+	} else if content.HasBackground {
 		slide.SetBackground(content.BgR, content.BgG, content.BgB)
 	}
 
@@ -65,6 +71,7 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				Y:        PointsToEMU(te.Y),
 				Width:    PointsToEMU(te.Width),
 				Height:   PointsToEMU(te.Height),
+				Rotation: te.Rotation,
 			}
 			if err := slide.AddTextBox(tb); err != nil {
 				log.Printf("warning: failed to add text box %d: %v", i, err)
@@ -93,6 +100,12 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				StrokeWidth: PointsToEMU(sh.StrokeWidth),
 				EvenOdd:     sh.EvenOdd,
 				SimpleRect:  sh.SimpleRect,
+			}
+			if sh.Gradient != nil && len(sh.Gradient.Stops) >= 2 {
+				out.Gradient = &goppt.Gradient{Angle: sh.Gradient.Angle}
+				for _, s := range sh.Gradient.Stops {
+					out.Gradient.Stops = append(out.Gradient.Stops, goppt.GradientStop{Pos: s.Pos, R: s.R, G: s.G, B: s.B})
+				}
 			}
 			for _, op := range sh.Path {
 				out.Path = append(out.Path, goppt.PathOp{

@@ -35,6 +35,7 @@ type TextElement struct {
 	Y        float64 `json:"y"`
 	Width    float64 `json:"width"`
 	Height   float64 `json:"height"`
+	Rotation float64 `json:"rotation,omitempty"`
 }
 
 // PathOp is one command of a vector outline. Coordinates are in points,
@@ -52,23 +53,38 @@ type PathOp struct {
 // ShapeElement is a filled and/or stroked vector path (rectangles, rules,
 // rounded rectangles, and other outlines recovered from the PDF).
 type ShapeElement struct {
-	X           float64  `json:"x"`
-	Y           float64  `json:"y"`
-	Width       float64  `json:"width"`
-	Height      float64  `json:"height"`
-	HasFill     bool     `json:"hasFill"`
-	FillR       uint8    `json:"fillR"`
-	FillG       uint8    `json:"fillG"`
-	FillB       uint8    `json:"fillB"`
-	FillAlpha   float64  `json:"fillAlpha"`
-	HasStroke   bool     `json:"hasStroke"`
-	StrokeR     uint8    `json:"strokeR"`
-	StrokeG     uint8    `json:"strokeG"`
-	StrokeB     uint8    `json:"strokeB"`
-	StrokeWidth float64  `json:"strokeWidth"`
-	EvenOdd     bool     `json:"evenOdd"`
-	SimpleRect  bool     `json:"simpleRect"`
-	Path        []PathOp `json:"path,omitempty"`
+	X           float64       `json:"x"`
+	Y           float64       `json:"y"`
+	Width       float64       `json:"width"`
+	Height      float64       `json:"height"`
+	HasFill     bool          `json:"hasFill"`
+	FillR       uint8         `json:"fillR"`
+	FillG       uint8         `json:"fillG"`
+	FillB       uint8         `json:"fillB"`
+	FillAlpha   float64       `json:"fillAlpha"`
+	HasStroke   bool          `json:"hasStroke"`
+	StrokeR     uint8         `json:"strokeR"`
+	StrokeG     uint8         `json:"strokeG"`
+	StrokeB     uint8         `json:"strokeB"`
+	StrokeWidth float64       `json:"strokeWidth"`
+	EvenOdd     bool          `json:"evenOdd"`
+	SimpleRect  bool          `json:"simpleRect"`
+	Path        []PathOp      `json:"path,omitempty"`
+	Gradient    *GradientFill `json:"gradient,omitempty"`
+}
+
+// GradientStop is one color along an axial blend. Pos runs from 0 to 1.
+type GradientStop struct {
+	Pos float64 `json:"pos"`
+	R   uint8   `json:"r"`
+	G   uint8   `json:"g"`
+	B   uint8   `json:"b"`
+}
+
+// GradientFill is a linear gradient recovered from a PDF shading.
+type GradientFill struct {
+	Angle float64        `json:"angle"`
+	Stops []GradientStop `json:"stops"`
 }
 
 // PageElement is one drawable in paint order. Exactly one of the pointers is set.
@@ -97,6 +113,7 @@ type PageContent struct {
 	BgR           uint8          `json:"bgR"`
 	BgG           uint8          `json:"bgG"`
 	BgB           uint8          `json:"bgB"`
+	BgGradient    *GradientFill  `json:"bgGradient,omitempty"`
 	Elements      []PageElement  `json:"elements"`
 	TextElements  []TextElement  `json:"textElements"`
 	ImageElements []ImageElement `json:"imageElements"`

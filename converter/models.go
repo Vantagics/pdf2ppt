@@ -29,10 +29,53 @@ type TextElement struct {
 	ColorR   uint8   `json:"colorR"`
 	ColorG   uint8   `json:"colorG"`
 	ColorB   uint8   `json:"colorB"`
+	Bold     bool    `json:"bold"`
+	Italic   bool    `json:"italic"`
 	X        float64 `json:"x"`
 	Y        float64 `json:"y"`
 	Width    float64 `json:"width"`
 	Height   float64 `json:"height"`
+}
+
+// PathOp is one command of a vector outline. Coordinates are in points,
+// relative to the shape box, with y growing downward.
+type PathOp struct {
+	Op string  `json:"op"` // M, L, C, Z
+	X  float64 `json:"x"`
+	Y  float64 `json:"y"`
+	X1 float64 `json:"x1,omitempty"`
+	Y1 float64 `json:"y1,omitempty"`
+	X2 float64 `json:"x2,omitempty"`
+	Y2 float64 `json:"y2,omitempty"`
+}
+
+// ShapeElement is a filled and/or stroked vector path (rectangles, rules,
+// rounded rectangles, and other outlines recovered from the PDF).
+type ShapeElement struct {
+	X           float64  `json:"x"`
+	Y           float64  `json:"y"`
+	Width       float64  `json:"width"`
+	Height      float64  `json:"height"`
+	HasFill     bool     `json:"hasFill"`
+	FillR       uint8    `json:"fillR"`
+	FillG       uint8    `json:"fillG"`
+	FillB       uint8    `json:"fillB"`
+	FillAlpha   float64  `json:"fillAlpha"`
+	HasStroke   bool     `json:"hasStroke"`
+	StrokeR     uint8    `json:"strokeR"`
+	StrokeG     uint8    `json:"strokeG"`
+	StrokeB     uint8    `json:"strokeB"`
+	StrokeWidth float64  `json:"strokeWidth"`
+	EvenOdd     bool     `json:"evenOdd"`
+	SimpleRect  bool     `json:"simpleRect"`
+	Path        []PathOp `json:"path,omitempty"`
+}
+
+// PageElement is one drawable in paint order. Exactly one of the pointers is set.
+type PageElement struct {
+	Text  *TextElement  `json:"text,omitempty"`
+	Image *ImageElement `json:"image,omitempty"`
+	Shape *ShapeElement `json:"shape,omitempty"`
 }
 
 // ImageElement 从 PDF 页面中提取的图片元素
@@ -45,10 +88,16 @@ type ImageElement struct {
 	Height float64 `json:"height"`
 }
 
-// PageContent 一个 PDF 页面中提取的所有元素集合
+// PageContent 一个 PDF 页面中提取的所有元素集合.
+// Coordinates are points, origin at the top-left, y growing downward.
 type PageContent struct {
 	PageWidth     float64        `json:"pageWidth"`
 	PageHeight    float64        `json:"pageHeight"`
+	HasBackground bool           `json:"hasBackground"`
+	BgR           uint8          `json:"bgR"`
+	BgG           uint8          `json:"bgG"`
+	BgB           uint8          `json:"bgB"`
+	Elements      []PageElement  `json:"elements"`
 	TextElements  []TextElement  `json:"textElements"`
 	ImageElements []ImageElement `json:"imageElements"`
 }

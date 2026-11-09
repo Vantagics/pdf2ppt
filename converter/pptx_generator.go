@@ -32,38 +32,79 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 	heightEMU := PointsToEMU(content.PageHeight)
 
 	slide := g.ppt.AddSlide(widthEMU, heightEMU)
+	if content.HasBackground {
+		slide.SetBackground(content.BgR, content.BgG, content.BgB)
+	}
 
-	for i, te := range content.TextElements {
-		tb := &goppt.TextBox{
-			Content:  te.Content,
-			FontName: te.FontName,
-			FontSize: te.FontSize,
-			ColorR:   te.ColorR,
-			ColorG:   te.ColorG,
-			ColorB:   te.ColorB,
-			X:        PointsToEMU(te.X),
-			Y:        PointsToEMU(te.Y),
-			Width:    PointsToEMU(te.Width),
-			Height:   PointsToEMU(te.Height),
+	elements := content.Elements
+	if len(elements) == 0 {
+		for i := range content.TextElements {
+			te := content.TextElements[i]
+			elements = append(elements, PageElement{Text: &te})
 		}
-		if err := slide.AddTextBox(tb); err != nil {
-			log.Printf("warning: failed to add text box %d: %v", i, err)
-			continue
+		for i := range content.ImageElements {
+			ie := content.ImageElements[i]
+			elements = append(elements, PageElement{Image: &ie})
 		}
 	}
 
-	for i, ie := range content.ImageElements {
-		img := &goppt.Image{
-			Data:   ie.Data,
-			Format: ie.Format,
-			X:      PointsToEMU(ie.X),
-			Y:      PointsToEMU(ie.Y),
-			Width:  PointsToEMU(ie.Width),
-			Height: PointsToEMU(ie.Height),
-		}
-		if err := slide.AddImage(img); err != nil {
-			log.Printf("warning: failed to add image %d: %v", i, err)
-			continue
+	for i, el := range elements {
+		switch {
+		case el.Text != nil:
+			te := el.Text
+			tb := &goppt.TextBox{
+				Content:  te.Content,
+				FontName: te.FontName,
+				FontSize: te.FontSize,
+				ColorR:   te.ColorR,
+				ColorG:   te.ColorG,
+				ColorB:   te.ColorB,
+				Bold:     te.Bold,
+				Italic:   te.Italic,
+				X:        PointsToEMU(te.X),
+				Y:        PointsToEMU(te.Y),
+				Width:    PointsToEMU(te.Width),
+				Height:   PointsToEMU(te.Height),
+			}
+			if err := slide.AddTextBox(tb); err != nil {
+				log.Printf("warning: failed to add text box %d: %v", i, err)
+			}
+		case el.Image != nil:
+			ie := el.Image
+			img := &goppt.Image{
+				Data:   ie.Data,
+				Format: ie.Format,
+				X:      PointsToEMU(ie.X),
+				Y:      PointsToEMU(ie.Y),
+				Width:  PointsToEMU(ie.Width),
+				Height: PointsToEMU(ie.Height),
+			}
+			if err := slide.AddImage(img); err != nil {
+				log.Printf("warning: failed to add image %d: %v", i, err)
+			}
+		case el.Shape != nil:
+			sh := el.Shape
+			out := &goppt.Shape{
+				X: PointsToEMU(sh.X), Y: PointsToEMU(sh.Y),
+				Width: PointsToEMU(sh.Width), Height: PointsToEMU(sh.Height),
+				HasFill: sh.HasFill, FillR: sh.FillR, FillG: sh.FillG, FillB: sh.FillB,
+				FillAlpha: sh.FillAlpha,
+				HasStroke: sh.HasStroke, StrokeR: sh.StrokeR, StrokeG: sh.StrokeG, StrokeB: sh.StrokeB,
+				StrokeWidth: PointsToEMU(sh.StrokeWidth),
+				EvenOdd:     sh.EvenOdd,
+				SimpleRect:  sh.SimpleRect,
+			}
+			for _, op := range sh.Path {
+				out.Path = append(out.Path, goppt.PathOp{
+					Op: op.Op,
+					X:  PointsToEMU(op.X), Y: PointsToEMU(op.Y),
+					X1: PointsToEMU(op.X1), Y1: PointsToEMU(op.Y1),
+					X2: PointsToEMU(op.X2), Y2: PointsToEMU(op.Y2),
+				})
+			}
+			if err := slide.AddShape(out); err != nil {
+				log.Printf("warning: failed to add shape %d: %v", i, err)
+			}
 		}
 	}
 

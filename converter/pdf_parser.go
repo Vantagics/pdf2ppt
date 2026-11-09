@@ -65,53 +65,105 @@ func (p *PDFParser) ExtractPageContent(pageNum int) (*PageContent, error) {
 	content := &PageContent{
 		PageWidth:     page.Width,
 		PageHeight:    page.Height,
+		HasBackground: page.HasBackground,
+		BgR:           page.BgR,
+		BgG:           page.BgG,
+		BgB:           page.BgB,
+		Elements:      make([]PageElement, 0, len(page.Elements)),
 		TextElements:  make([]TextElement, 0, len(page.TextObjects)),
 		ImageElements: make([]ImageElement, 0, len(page.Images)),
 	}
 
-	// 提取文本元素
-	for _, textObj := range page.TextObjects {
-		elem := TextElement{
-			Content: textObj.Content,
-			ColorR:  textObj.ColorR,
-			ColorG:  textObj.ColorG,
-			ColorB:  textObj.ColorB,
-			X:       textObj.X,
-			Y:       textObj.Y,
-			Width:   textObj.Width,
-			Height:  textObj.Height,
+	for _, el := range page.Elements {
+		switch {
+		case el.Text != nil:
+			elem := textFromPDF(el.Text)
+			content.Elements = append(content.Elements, PageElement{Text: &elem})
+			content.TextElements = append(content.TextElements, elem)
+		case el.Image != nil:
+			elem := imageFromPDF(el.Image)
+			content.Elements = append(content.Elements, PageElement{Image: &elem})
+			content.ImageElements = append(content.ImageElements, elem)
+		case el.Shape != nil:
+			elem := shapeFromPDF(el.Shape)
+			content.Elements = append(content.Elements, PageElement{Shape: &elem})
 		}
-
-		// 字体缺失时使用默认值
-		if textObj.FontName == "" {
-			elem.FontName = DefaultFontName
-		} else {
-			elem.FontName = textObj.FontName
-		}
-
-		if textObj.FontSize == 0 {
-			elem.FontSize = DefaultFontSize
-		} else {
-			elem.FontSize = textObj.FontSize
-		}
-
-		content.TextElements = append(content.TextElements, elem)
 	}
-
-	// 提取图片元素
-	for _, imgObj := range page.Images {
-		elem := ImageElement{
-			Data:   imgObj.Data,
-			Format: imgObj.Format,
-			X:      imgObj.X,
-			Y:      imgObj.Y,
-			Width:  imgObj.Width,
-			Height: imgObj.Height,
+	// Pages produced by older callers that only fill the typed slices.
+	if len(page.Elements) == 0 {
+		for _, textObj := range page.TextObjects {
+			elem := textFromPDF(textObj)
+			content.TextElements = append(content.TextElements, elem)
+			content.Elements = append(content.Elements, PageElement{Text: &elem})
 		}
-		content.ImageElements = append(content.ImageElements, elem)
+		for _, imgObj := range page.Images {
+			elem := imageFromPDF(imgObj)
+			content.ImageElements = append(content.ImageElements, elem)
+			content.Elements = append(content.Elements, PageElement{Image: &elem})
+		}
 	}
 
 	return content, nil
+}
+
+func textFromPDF(textObj *gopdf2.TextObject) TextElement {
+	elem := TextElement{
+		Content:  textObj.Content,
+		ColorR:   textObj.ColorR,
+		ColorG:   textObj.ColorG,
+		ColorB:   textObj.ColorB,
+		Bold:     textObj.Bold,
+		Italic:   textObj.Italic,
+		X:        textObj.X,
+		Y:        textObj.Y,
+		Width:    textObj.Width,
+		Height:   textObj.Height,
+		FontName: textObj.FontName,
+		FontSize: textObj.FontSize,
+	}
+	if elem.FontName == "" {
+		elem.FontName = DefaultFontName
+	}
+	if elem.FontSize == 0 {
+		elem.FontSize = DefaultFontSize
+	}
+	if elem.Width < 1 {
+		elem.Width = 1
+	}
+	if elem.Height < 1 {
+		elem.Height = elem.FontSize
+	}
+	return elem
+}
+
+func imageFromPDF(imgObj *gopdf2.ImageObject) ImageElement {
+	return ImageElement{
+		Data:   imgObj.Data,
+		Format: imgObj.Format,
+		X:      imgObj.X,
+		Y:      imgObj.Y,
+		Width:  imgObj.Width,
+		Height: imgObj.Height,
+	}
+}
+
+func shapeFromPDF(sh *gopdf2.ShapeObject) ShapeElement {
+	elem := ShapeElement{
+		X: sh.X, Y: sh.Y, Width: sh.Width, Height: sh.Height,
+		HasFill: sh.HasFill, FillR: sh.FillR, FillG: sh.FillG, FillB: sh.FillB,
+		FillAlpha: sh.FillAlpha,
+		HasStroke: sh.HasStroke, StrokeR: sh.StrokeR, StrokeG: sh.StrokeG, StrokeB: sh.StrokeB,
+		StrokeWidth: sh.StrokeWidth, EvenOdd: sh.EvenOdd, SimpleRect: sh.SimpleRect,
+	}
+	if elem.FillAlpha <= 0 {
+		elem.FillAlpha = 1
+	}
+	for _, op := range sh.Path {
+		elem.Path = append(elem.Path, PathOp{
+			Op: op.Op, X: op.X, Y: op.Y, X1: op.X1, Y1: op.Y1, X2: op.X2, Y2: op.Y2,
+		})
+	}
+	return elem
 }
 
 // Close 关闭 PDF 文档，释放资源

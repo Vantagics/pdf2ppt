@@ -1,34 +1,51 @@
-// Package gopdf2 provides PDF parsing capabilities.
-// This is a local implementation providing the interfaces needed
-// for PDF text and image extraction.
+// Package gopdf2 reads PDF pages into editable text, images, and vector shapes.
+// Coordinates on a Page are in points with the origin at the top-left (y grows
+// downward), matching PowerPoint. The package understands compressed content
+// streams, ToUnicode maps (including CJK), images, and path fills.
 package gopdf2
 
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"strings"
+
+	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 )
 
-// Document represents an opened PDF document.
+// Document is an opened PDF.
 type Document struct {
 	pages []*Page
-	file  *os.File
+	ctx   *model.Context
 }
 
-// Page represents a single page in a PDF document.
+// Page is one PDF page worth of drawing commands.
 type Page struct {
-	Width       float64
-	Height      float64
+	Width         float64
+	Height        float64
+	HasBackground bool
+	BgR, BgG, BgB uint8
+	Elements      []PageElement
+	// TextObjects and Images mirror Elements for callers that scan by type.
 	TextObjects []*TextObject
 	Images      []*ImageObject
 }
 
-// TextObject represents a text element on a PDF page.
+// PageElement is one painted object in content-stream order.
+type PageElement struct {
+	Text  *TextObject
+	Image *ImageObject
+	Shape *ShapeObject
+}
+
+// TextObject is a single text run (one Tj/TJ showing).
 type TextObject struct {
 	Content  string
-	FontName string  // Empty string means font info is missing
-	FontSize float64 // 0 means font size info is missing
+	FontName string
+	FontSize float64
+	Bold     bool
+	Italic   bool
 	ColorR   uint8
 	ColorG   uint8
 	ColorB   uint8
@@ -38,18 +55,39 @@ type TextObject struct {
 	Height   float64
 }
 
-// ImageObject represents an image element on a PDF page.
+// ImageObject is a raster image placed on the page.
 type ImageObject struct {
 	Data   []byte
-	Format string  // "png", "jpeg", etc.
+	Format string // "png" or "jpeg"
 	X      float64
 	Y      float64
 	Width  float64
 	Height float64
 }
 
-// Open opens and validates a PDF file, returning a Document.
-// Returns an error if the file doesn't exist, can't be read, or is not a valid PDF.
+// PathOp is one command of a shape outline in shape-local, y-down points.
+type PathOp struct {
+	Op     string // "M", "L", "C", "Z"
+	X, Y   float64
+	X1, Y1 float64
+	X2, Y2 float64
+}
+
+// ShapeObject is a filled and/or stroked path.
+type ShapeObject struct {
+	X, Y, Width, Height       float64
+	HasFill                   bool
+	FillR, FillG, FillB       uint8
+	FillAlpha                 float64
+	HasStroke                 bool
+	StrokeR, StrokeG, StrokeB uint8
+	StrokeWidth               float64
+	EvenOdd                   bool
+	SimpleRect                bool
+	Path                      []PathOp
+}
+
+// Open reads and validates a PDF file.
 func Open(filePath string) (*Document, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -58,52 +96,48 @@ func Open(filePath string) (*Document, error) {
 		}
 		return nil, fmt.Errorf("无法读取文件: %w", err)
 	}
+	defer f.Close()
 
-	// Read the first bytes to validate PDF magic number
 	header := make([]byte, 5)
 	n, err := f.Read(header)
-	if err != nil || n < 5 {
-		f.Close()
-		return nil, errors.New("文件不是有效的 PDF 格式")
-	}
-	if string(header[:5]) != "%PDF-" {
-		f.Close()
+	if err != nil || n < 5 || string(header) != "%PDF-" {
 		return nil, errors.New("文件不是有效的 PDF 格式")
 	}
 
-	// Reset to beginning for full parsing
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		f.Close()
-		return nil, fmt.Errorf("无法读取文件: %w", err)
-	}
-
-	// Parse the PDF content
-	doc, err := parsePDF(f)
+	ctx, err := api.ReadContextFile(filePath)
 	if err != nil {
-		f.Close()
+		msg := err.Error()
+		if strings.Contains(msg, "no such file") || strings.Contains(msg, "permission") {
+			return nil, fmt.Errorf("无法读取文件: %w", err)
+		}
+		return nil, fmt.Errorf("文件不是有效的 PDF 格式: %w", err)
+	}
+
+	doc := &Document{ctx: ctx}
+	if err := doc.extractPages(); err != nil {
 		return nil, err
 	}
-	doc.file = f
 	return doc, nil
 }
 
-// PageCount returns the number of pages in the document.
+// PageCount returns the number of pages.
 func (d *Document) PageCount() int {
+	if d == nil {
+		return 0
+	}
 	return len(d.pages)
 }
 
-// GetPage returns the page at the given index (0-based).
+// GetPage returns the page at index (0-based).
 func (d *Document) GetPage(index int) (*Page, error) {
-	if index < 0 || index >= len(d.pages) {
-		return nil, fmt.Errorf("页码 %d 超出范围 (0-%d)", index, len(d.pages)-1)
+	if d == nil || index < 0 || index >= len(d.pages) {
+		return nil, fmt.Errorf("页码 %d 超出范围", index)
 	}
 	return d.pages[index], nil
 }
 
-// Close closes the document and releases resources.
+// Close releases the document.
 func (d *Document) Close() error {
-	if d.file != nil {
-		return d.file.Close()
-	}
+	d.ctx = nil
 	return nil
 }

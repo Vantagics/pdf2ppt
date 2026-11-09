@@ -16,9 +16,11 @@ type Presentation struct {
 
 // Slide represents a single slide in the presentation.
 type Slide struct {
-	Width    int64 // Width in EMU
-	Height   int64 // Height in EMU
-	Elements []Element
+	Width         int64 // Width in EMU
+	Height        int64 // Height in EMU
+	HasBackground bool
+	BgR, BgG, BgB uint8
+	Elements      []Element
 }
 
 // Element is an interface for slide elements.
@@ -34,10 +36,34 @@ type TextBox struct {
 	ColorR   uint8
 	ColorG   uint8
 	ColorB   uint8
+	Bold     bool
+	Italic   bool
 	X        int64 // Position X in EMU
 	Y        int64 // Position Y in EMU
 	Width    int64 // Width in EMU
 	Height   int64 // Height in EMU
+}
+
+// PathOp is a shape-local path command. Coordinates are EMU, y grows down.
+type PathOp struct {
+	Op     string
+	X, Y   int64
+	X1, Y1 int64
+	X2, Y2 int64
+}
+
+// Shape is a vector outline on a slide.
+type Shape struct {
+	X, Y, Width, Height       int64
+	HasFill                   bool
+	FillR, FillG, FillB       uint8
+	FillAlpha                 float64
+	HasStroke                 bool
+	StrokeR, StrokeG, StrokeB uint8
+	StrokeWidth               int64
+	EvenOdd                   bool
+	SimpleRect                bool
+	Path                      []PathOp
 }
 
 func (t *TextBox) elementType() string { return "textbox" }
@@ -53,6 +79,8 @@ type Image struct {
 }
 
 func (i *Image) elementType() string { return "image" }
+
+func (s *Shape) elementType() string { return "shape" }
 
 // NewPresentation creates a new empty presentation.
 func NewPresentation() *Presentation {
@@ -94,6 +122,24 @@ func (s *Slide) AddTextBox(tb *TextBox) error {
 		return fmt.Errorf("text box dimensions must be positive, got width=%d height=%d", tb.Width, tb.Height)
 	}
 	s.Elements = append(s.Elements, tb)
+	return nil
+}
+
+// SetBackground sets a solid slide background.
+func (s *Slide) SetBackground(r, g, b uint8) {
+	s.HasBackground = true
+	s.BgR, s.BgG, s.BgB = r, g, b
+}
+
+// AddShape adds a vector shape to the slide.
+func (s *Slide) AddShape(sh *Shape) error {
+	if sh == nil {
+		return fmt.Errorf("shape cannot be nil")
+	}
+	if sh.Width <= 0 || sh.Height <= 0 {
+		return fmt.Errorf("shape dimensions must be positive, got width=%d height=%d", sh.Width, sh.Height)
+	}
+	s.Elements = append(s.Elements, sh)
 	return nil
 }
 

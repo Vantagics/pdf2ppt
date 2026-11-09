@@ -3,6 +3,7 @@ package goppt
 import (
 	"archive/zip"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -87,6 +88,11 @@ func writeSlideXML(w *zip.Writer, slide *Slide, slideNum int) error {
 	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
 	sb.WriteString(`<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">`)
 	sb.WriteString(`<p:cSld>`)
+	if slide.HasBackground {
+		sb.WriteString(`<p:bg><p:bgPr>`)
+		sb.WriteString(fmt.Sprintf(`<a:solidFill><a:srgbClr val="%02X%02X%02X"/></a:solidFill>`, slide.BgR, slide.BgG, slide.BgB))
+		sb.WriteString(`<a:effectLst/></p:bgPr></p:bg>`)
+	}
 	sb.WriteString(`<p:spTree>`)
 	sb.WriteString(`<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>`)
 	sb.WriteString(`<p:grpSpPr/>`)
@@ -103,6 +109,9 @@ func writeSlideXML(w *zip.Writer, slide *Slide, slideNum int) error {
 			sb.WriteString(formatImage(e, shapeID, imageIdx))
 			shapeID++
 			imageIdx++
+		case *Shape:
+			sb.WriteString(formatShape(e, shapeID))
+			shapeID++
 		}
 	}
 
@@ -120,20 +129,123 @@ func writeSlideXML(w *zip.Writer, slide *Slide, slideNum int) error {
 
 func formatTextBox(tb *TextBox, id int) string {
 	colorHex := fmt.Sprintf("%02X%02X%02X", tb.ColorR, tb.ColorG, tb.ColorB)
-	fontSize := int(tb.FontSize * 100) // OOXML font size is in hundredths of a point
+	fontSize := int(math.Round(tb.FontSize * 100)) // hundredths of a point
+	if fontSize < 100 {
+		fontSize = 100
+	}
+	lang := "en-US"
+	if containsCJK(tb.Content) {
+		lang = "zh-CN"
+	}
+	b := "0"
+	if tb.Bold {
+		b = "1"
+	}
+	i := "0"
+	if tb.Italic {
+		i = "1"
+	}
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(`<p:sp><p:nvSpPr><p:cNvPr id="%d" name="TextBox %d"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>`, id, id))
 	sb.WriteString(fmt.Sprintf(`<p:spPr><a:xfrm><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, tb.X, tb.Y, tb.Width, tb.Height))
-	sb.WriteString(`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>`)
-	sb.WriteString(`<p:txBody><a:bodyPr wrap="square" rtlCol="0"/>`)
-	sb.WriteString(fmt.Sprintf(`<a:p><a:r><a:rPr lang="zh-CN" sz="%d"><a:solidFill><a:srgbClr val="%s"/></a:solidFill>`, fontSize, colorHex))
+	sb.WriteString(`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr>`)
+	sb.WriteString(`<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t" horzOverflow="overflow" vertOverflow="overflow"/>`)
+	sb.WriteString(`<a:lstStyle/>`)
+	// 100% line spacing keeps the first baseline on the font's em box. The
+	// default (omitted) spacing adds external leading and drops the glyphs.
+	sb.WriteString(`<a:p><a:pPr marL="0" indent="0"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:buNone/></a:pPr>`)
+	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s" dirty="0"><a:solidFill><a:srgbClr val="%s"/></a:solidFill>`, lang, fontSize, b, i, colorHex))
 	if tb.FontName != "" {
-		sb.WriteString(fmt.Sprintf(`<a:latin typeface="%s"/><a:ea typeface="%s"/>`, tb.FontName, tb.FontName))
+		name := escapeXML(tb.FontName)
+		sb.WriteString(fmt.Sprintf(`<a:latin typeface="%s"/><a:ea typeface="%s"/><a:cs typeface="%s"/>`, name, name, name))
 	}
 	sb.WriteString(fmt.Sprintf(`</a:rPr><a:t>%s</a:t></a:r></a:p>`, escapeXML(tb.Content)))
 	sb.WriteString(`</p:txBody></p:sp>`)
+	return sb.String()
+}
 
+func containsCJK(s string) bool {
+	for _, r := range s {
+		if r >= 0x2E80 && r <= 0x9FFF {
+			return true
+		}
+	}
+	return false
+}
+
+func formatShape(sh *Shape, id int) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf(`<p:sp><p:nvSpPr><p:cNvPr id="%d" name="Shape %d"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>`, id, id))
+	sb.WriteString(`<p:spPr>`)
+	sb.WriteString(fmt.Sprintf(`<a:xfrm><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, sh.X, sh.Y, sh.Width, sh.Height))
+	if sh.SimpleRect || len(sh.Path) == 0 {
+		sb.WriteString(`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>`)
+	} else {
+		sb.WriteString(formatCustGeom(sh))
+	}
+	if sh.HasFill {
+		sb.WriteString(`<a:solidFill><a:srgbClr val="` + fmt.Sprintf("%02X%02X%02X", sh.FillR, sh.FillG, sh.FillB) + `"`)
+		if sh.FillAlpha > 0 && sh.FillAlpha < 0.999 {
+			alpha := int(math.Round(sh.FillAlpha * 100000))
+			sb.WriteString(fmt.Sprintf(`><a:alpha val="%d"/></a:srgbClr></a:solidFill>`, alpha))
+		} else {
+			sb.WriteString(`/></a:solidFill>`)
+		}
+	} else {
+		sb.WriteString(`<a:noFill/>`)
+	}
+	if sh.HasStroke && sh.StrokeWidth > 0 {
+		sb.WriteString(fmt.Sprintf(`<a:ln w="%d" cap="flat" cmpd="sng"><a:solidFill><a:srgbClr val="%02X%02X%02X"/></a:solidFill><a:prstDash val="solid"/></a:ln>`,
+			sh.StrokeWidth, sh.StrokeR, sh.StrokeG, sh.StrokeB))
+	} else {
+		sb.WriteString(`<a:ln><a:noFill/></a:ln>`)
+	}
+	sb.WriteString(`</p:spPr></p:sp>`)
+	return sb.String()
+}
+
+func formatCustGeom(sh *Shape) string {
+	fill := "norm"
+	if sh.EvenOdd {
+		fill = "evenOdd"
+	}
+	w, h := sh.Width, sh.Height
+	if w < 1 {
+		w = 1
+	}
+	if h < 1 {
+		h = 1
+	}
+	clamp := func(v, max int64) int64 {
+		if v < 0 {
+			return 0
+		}
+		if v > max {
+			return max
+		}
+		return v
+	}
+	var sb strings.Builder
+	sb.WriteString(`<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/><a:pathLst>`)
+	sb.WriteString(fmt.Sprintf(`<a:path w="%d" h="%d" fill="%s">`, w, h, fill))
+	for _, op := range sh.Path {
+		switch op.Op {
+		case "M":
+			sb.WriteString(fmt.Sprintf(`<a:moveTo><a:pt x="%d" y="%d"/></a:moveTo>`, clamp(op.X, w), clamp(op.Y, h)))
+		case "L":
+			sb.WriteString(fmt.Sprintf(`<a:lnTo><a:pt x="%d" y="%d"/></a:lnTo>`, clamp(op.X, w), clamp(op.Y, h)))
+		case "C":
+			sb.WriteString(`<a:cubicBezTo>`)
+			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X1, w), clamp(op.Y1, h)))
+			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X2, w), clamp(op.Y2, h)))
+			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X, w), clamp(op.Y, h)))
+			sb.WriteString(`</a:cubicBezTo>`)
+		case "Z":
+			sb.WriteString(`<a:close/>`)
+		}
+	}
+	sb.WriteString(`</a:path></a:pathLst></a:custGeom>`)
 	return sb.String()
 }
 
@@ -199,5 +311,3 @@ var xmlReplacer = strings.NewReplacer(
 func escapeXML(s string) string {
 	return xmlReplacer.Replace(s)
 }
-
-

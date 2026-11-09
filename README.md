@@ -60,6 +60,17 @@ Parser checks that do not need LibreOffice:
 go test ./converter/gopdf2 ./converter -count=1 -run 'TestNormalize|TestToUnicode|TestTokenizer|TestRejects|TestEmpty'
 ```
 
+## Real slide decks
+
+`tests/corpus/manifest.json` lists presentation PDFs whose producer metadata was checked (PowerPoint 2016, PowerPoint for Microsoft 365, Keynote, and a Skia/PDF print of `tests/corpus/slides.html`, which is the same PDF backend Google Slides uses). Those downloaded decks are not committed: the license was not clear, or the file is someone else's talk. `tests/corpus/fetch.py` downloads them into `tests/corpus/cache/`.
+
+```bash
+python3 tests/corpus/fetch.py
+go test ./converter -run 'TestRoundTrip|TestChromeSkiaSlide' -count=1 -timeout 20m
+```
+
+On the decks that were checked, PowerPoint and Keynote pages keep their pictures and layout. Accented text (Catalan à è é í ó) needed WinAnsi, which PowerPoint uses when there is no ToUnicode map. Chrome/Skia gradients are axial shadings; rotated text is a real rotated text box. No redistributable WPS-exported deck was found.
+
 ## Known limitations
 
 - **One slide size per file.** OOXML stores a single `sldSz`. Every page is placed using its own box, but the presentation size follows the first page.

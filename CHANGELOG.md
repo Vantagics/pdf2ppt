@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.1.0
+
+Compatibility pass against real slide PDFs, not only the generated fixtures from 1.0.0.
+
+Checked producer metadata and converted sample pages from Microsoft PowerPoint 2016, PowerPoint for Microsoft 365, Keynote, and a Skia/PDF (Chrome) slide with a gradient, rotated text, and Chinese. The external PDFs are listed in `tests/corpus/manifest.json` and are not committed.
+
+- WinAnsi and MacRoman encodings are decoded, so PowerPoint text such as “Lluís”, “què és”, and “Damià” is no longer dropped when the font has no ToUnicode map.
+- Axial shading patterns (Chrome/Skia gradients) become linear gradient fills.
+- Rotated text is a rotated text box. A −18° Chrome label stays on its label.
+- A deck whose pages are different sizes uses the largest page as the single OOXML slide size, so a later page is not clipped.
+- An owner-password PDF with an empty user password opens. A user password is still rejected by the reader.
+
+Measured SSIM against the rendered source page (72 dpi unless noted):
+
+| Sample | Producer | Before this release | After |
+| --- | --- | ---: | ---: |
+| UAB ISC2, page 2 | PowerPoint 2016 | text missing à/è/é/í (“qu s”, “Llus”) | 0.982, accents restored |
+| UAB REO, title | PowerPoint 365 | “Dami” instead of “Damià”; photo kept | accents restored, photo kept |
+| MacAdmins talk, title | Keynote | 0.889 (paper texture re-encoded) | same class of result; text was already intact |
+| Chrome fixture, page 1 | Skia/PDF | 0.15 (black page, gradient dropped, rotated label misplaced) | 0.959 |
+
+No redistributable WPS Presentation PDF was found. LaTeX Beamer was not in this environment.
+
 ## 1.0.0
 
 First release of the editable PDF → PPTX converter.

@@ -1,6 +1,12 @@
 # Compatibility notes
 
+## v1.5.5
+
+v1.5.4 is regressed. Text boxes stay at the PDF x, including the next word. `kaist-xai` page 18 matches v1.5.3 again. `canva-rotary` page 16 keeps the last letter without shifting the following words. `he-openu-a11y` page 13 no longer overlaps באיתור and בניווט. Page 2, the Hebrew recall of 1, and the UNDP caption spaces stay. Those slides are in the render gate with a mean-error ceiling of 16. UNDP unique recall is recorded as 1.
+
 ## v1.5.4
+
+Superseded by v1.5.5.
 
 `canva-rotary` page 16 no longer clips the last letter of `nonprofit`, `Account`, `for`, or `not-for-profit`. The trailing space stays inside the box. `he-openu-a11y` pages 6, 10, and 13 keep a space between Latin and Hebrew, and unique recall against pdftotext is 1.000. Page 2's 50 and BCG lines are separate boxes again. The stored Hebrew recall baseline was 0.921444 from v1.5.0, which is why 98.54% did not fail the 0.3 pp gate. `uab-reo-m365` gate concat is 1419; an independent count of the same joined text is 1446.
 

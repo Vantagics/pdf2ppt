@@ -143,6 +143,12 @@ func contiguous(g []textRef, t *TextObject) bool {
 	if prev.holdX || t.holdX {
 		return false
 	}
+	// "t " is the last letter of "nonprofit", painted at its own PDF x.
+	// Folding it into the previous run lets the font advance miss that x.
+	trimmed := strings.TrimSpace(t.Content)
+	if strings.HasSuffix(t.Content, " ") && utf8.RuneCountInString(trimmed) <= 1 && utf8.RuneCountInString(strings.TrimSpace(prev.Content)) > 1 {
+		return false
+	}
 	gap := t.X - (prev.X + prev.Width)
 	em := math.Max(prev.FontSize, t.FontSize)
 	if em < 1 {
@@ -974,23 +980,30 @@ func pullBackOverlaps(p *Page) {
 		overlap := a.X + a.Width - b.X
 		// A formula's last glyph may cross the next parenthesis by a few
 		// points. Only a real collision (Andy through Morodo) is pulled back.
-		// A merged word that still carries its trailing space ("nonprofit ")
-		// and runs into the next word is the Canva "nonprofitorganizations"
-		// glue: stop the box at the next word.
+		// Never move the next box. v1.5.4 parked it on this box's right
+		// edge, and every later word shifted ("youregistered", kaist p18).
 		wordEdge := strings.HasSuffix(a.Content, " ") || strings.HasPrefix(b.Content, " ")
+		if overlap < math.Max(em*1.2, old*0.18) && !(wordEdge && overlap > 1.2) {
+			continue
+		}
+		pad := 0.4
 		if wordEdge {
-			// The box already holds the word and its trailing space.
-			// Shrinking it clipped the last letter ("nonprofi", "Accoun").
-			// Slide the next word to the right of the full advance.
-			if b.X < a.X+a.Width {
-				b.X = a.X + a.Width
+			pad = math.Max(pad, em*0.33)
+		}
+		nw := b.X - a.X - pad
+		// The gap may be narrower than the Latin glyphs. Keep enough
+		// width for the letters, or PowerPoint clips the last one
+		// ("nonprofi", "Accoun", "fo"). The next box is not moved.
+		// Hebrew is left to the PDF width: a wider box hangs from the
+		// right edge and covers the next word (באיתור over בניווט).
+		if !hasRTLScript(a.Content) {
+			if adv, ok := textWidth(a.FontName, a.Bold, a.Italic, a.FontSize, a.Content); ok && adv > nw {
+				nw = adv
 			}
+		}
+		if nw >= old-0.4 {
 			continue
 		}
-		if overlap < math.Max(em*1.2, old*0.18) {
-			continue
-		}
-		nw := b.X - a.X - 0.4
 		if nw < em*0.4 {
 			continue
 		}
@@ -999,6 +1012,10 @@ func pullBackOverlaps(p *Page) {
 			a.Tracking += (nw - old) / float64(gaps)
 		}
 		a.Width = nw
-		a.Clip = true
+		// Clip only when the box is still shorter than the glyphs. A box
+		// that holds the advance must not cut the last letter.
+		if adv, ok := textWidth(a.FontName, a.Bold, a.Italic, a.FontSize, a.Content); ok && nw < adv-0.4 {
+			a.Clip = true
+		}
 	}
 }

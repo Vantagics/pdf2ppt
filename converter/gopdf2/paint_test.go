@@ -518,20 +518,36 @@ func TestCanvaRotaryWordsAreNotClipped(t *testing.T) {
 }
 
 func TestMergeWordGap(t *testing.T) {
-	// The first box holds the word and its trailing space. Shrinking it
-	// to open a gap clips the last letter. The next word moves instead.
+	// The next word keeps its PDF x. Parking it on the previous box's
+	// edge is what shifted "you" into "registered" and the kaist lines.
 	a := &TextObject{Content: "not-for-profit ", X: 100, Y: 0, Width: 80, Height: 14, FontSize: 16}
 	b := &TextObject{Content: "basis", X: 150, Y: 0, Width: 40, Height: 14, FontSize: 16}
 	p := &Page{Elements: []PageElement{{Text: a}, {Text: b}}}
 	pullBackOverlaps(p)
-	if a.Width != 80 || a.Clip {
-		t.Fatalf("word box was shrunk or clipped: w %.1f clip %v", a.Width, a.Clip)
+	if a.X != 100 || b.X != 150 {
+		t.Fatalf("a box left its PDF x: a %.1f b %.1f", a.X, b.X)
 	}
 	if !strings.HasSuffix(a.Content, "t ") {
 		t.Fatalf("last letter dropped: %q", a.Content)
 	}
-	if b.X < a.X+a.Width-0.1 {
-		t.Fatalf("next word still overlaps the word: x %.1f end %.1f", b.X, a.X+a.Width)
+}
+
+func TestFinalLetterKeepsPDFX(t *testing.T) {
+	// The PDF paints "t " in the gap. Merging it onto "nonprofi" makes
+	// PowerPoint place that t by font advance, past "organizations".
+	word := &TextObject{Content: "nonprofi", X: 573.7, Y: 231, Width: 129.8, Height: 34, FontSize: 34.7}
+	letter := &TextObject{Content: "t ", X: 700, Y: 231, Width: 22, Height: 34, FontSize: 34.7}
+	next := &TextObject{Content: "organizations", X: 712.4, Y: 231, Width: 180, Height: 34, FontSize: 34.7}
+	p := &Page{Elements: []PageElement{{Text: word}, {Text: letter}, {Text: next}}}
+	mergeTextLines(p)
+	if letter.X != 700 || !strings.HasPrefix(letter.Content, "t") {
+		t.Fatalf("final letter left its box: x %.1f %q", letter.X, letter.Content)
+	}
+	if strings.Contains(word.Content, "t") {
+		t.Fatalf("final letter folded into the stem: %q", word.Content)
+	}
+	if next.X != 712.4 {
+		t.Fatalf("next word moved: %.1f", next.X)
 	}
 }
 

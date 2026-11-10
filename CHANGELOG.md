@@ -1,6 +1,18 @@
 # Changelog
 
+## 1.5.5
+
+v1.5.4 is regressed and superseded. It parked the next word on the previous box's right edge. PowerPoint then drew the last ink about 7 px past that edge, and every later word shifted. kaist-xai page 18 fell from 0.8672 to 0.7058. canva-rotary pages 16, 8, and 1 and he-openu page 13 dropped with it.
+
+A box stays at its PDF x. The next box stays at its own PDF x. A Latin word that would have been shortened past its glyphs keeps enough width for those glyphs, so the last letter is not clipped. Hebrew widths are unchanged, so באיתור no longer covers בניווט.
+
+The v1.5.4 text is kept: he-openu unique recall is 1, undp captions keep their trailing spaces and the recall baseline is 1, and he-openu page 2 is still the spaced pair with 60 on the left and the 50 and BCG lines in order.
+
+`TestRenderedSlidesMatchBaseline` now includes kaist-xai page 18, canva-rotary pages 1, 8, and 16, and he-openu page 13. Those four new pages, and canva-rotary page 1, fail when the mean pixel error rises above 16.
+
 ## 1.5.4
+
+Superseded by 1.5.5. The word-gap change below moved later words off their PDF x and is reverted.
 
 `canva-rotary` page 16 was clipping the last letter of a word that ends with a space. The box was shortened to open a gap, and PowerPoint drew "nonprofi", "Accoun", "fo", and "not-for-profi". The box keeps the PDF width, which already holds the glyph advance and the space, and the next word slides to the right of that box. `wrap="none"` and no clip, so the final t and r stay visible.
 

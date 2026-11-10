@@ -19,9 +19,10 @@ import (
 // McGill, the Keynote lock). A filled hole moves the mean pixel error well
 // past the tolerance.
 type renderSample struct {
-	Name string `json:"name"`
-	ID   string `json:"id"`
-	Page int    `json:"page"`
+	Name      string  `json:"name"`
+	ID        string  `json:"id"`
+	Page      int     `json:"page"`
+	MaxAbsErr float64 `json:"maxAbsErr,omitempty"`
 }
 
 func TestRenderedSlidesMatchBaseline(t *testing.T) {
@@ -71,8 +72,14 @@ func TestRenderedSlidesMatchBaseline(t *testing.T) {
 			// The stored PNGs were rendered with LibreOffice 24.2. GitHub
 			// Actions has 26.2, and the same PPTX differs by up to about 16
 			// on text edges. A filled hole (the WPS title card) is about 90.
-			if errv > 24 {
-				t.Fatalf("mean abs error %.2f against the stored render (hole or layout changed)", errv)
+			// Slides that regressed in v1.5.4 carry a tighter ceiling so a
+			// later shift of that page fails even when the mean stays under 24.
+			ceiling := 24.0
+			if j.sample.MaxAbsErr > 0 {
+				ceiling = j.sample.MaxAbsErr
+			}
+			if errv > ceiling {
+				t.Fatalf("mean abs error %.2f, stored ceiling %.2f (layout changed)", errv, ceiling)
 			}
 		})
 	}

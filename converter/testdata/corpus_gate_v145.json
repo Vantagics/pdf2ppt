@@ -356,7 +356,8 @@
     {
       "name": "canva-rotary-p1",
       "id": "canva-rotary",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 16
     },
     {
       "name": "cdc-nbs-m365-p1",
@@ -527,6 +528,30 @@
       "name": "oicw-1996-scan-p1",
       "id": "oicw-1996-scan",
       "page": 1
+    },
+    {
+      "name": "kaist-xai-p18",
+      "id": "kaist-xai",
+      "page": 18,
+      "maxAbsErr": 16
+    },
+    {
+      "name": "canva-rotary-p8",
+      "id": "canva-rotary",
+      "page": 8,
+      "maxAbsErr": 16
+    },
+    {
+      "name": "canva-rotary-p16",
+      "id": "canva-rotary",
+      "page": 16,
+      "maxAbsErr": 16
+    },
+    {
+      "name": "he-openu-a11y-p13",
+      "id": "he-openu-a11y",
+      "page": 13,
+      "maxAbsErr": 16
     }
   ]
 }

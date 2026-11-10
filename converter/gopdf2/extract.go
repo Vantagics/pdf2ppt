@@ -1,6 +1,8 @@
 package gopdf2
 
 import (
+	"math"
+
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 )
@@ -71,6 +73,8 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	if inh != nil && inh.Rotate != 0 {
 		applyRotation(page, inh.Rotate)
 	}
+	mergeTextLines(page)
+	page.syncLists()
 	return page, nil
 }
 
@@ -94,18 +98,123 @@ func applyRotation(p *Page, deg int) {
 		el := &p.Elements[i]
 		switch {
 		case el.Text != nil:
-			el.Text.X, el.Text.Y, el.Text.Width, el.Text.Height = rotateBox(deg, w, h, el.Text.X, el.Text.Y, el.Text.Width, el.Text.Height)
+			// The box is the unrotated glyph box; rot spins it around its
+			// center. Move the center and add the page angle. Swapping the
+			// box and leaving rot in place draws the text on its side.
+			el.Text.X, el.Text.Y, el.Text.Width, el.Text.Height, el.Text.Rotation = rotatePlaced(deg, w, h, el.Text.X, el.Text.Y, el.Text.Width, el.Text.Height, el.Text.Rotation)
 		case el.Image != nil:
-			el.Image.X, el.Image.Y, el.Image.Width, el.Image.Height = rotateBox(deg, w, h, el.Image.X, el.Image.Y, el.Image.Width, el.Image.Height)
+			el.Image.X, el.Image.Y, el.Image.Width, el.Image.Height, el.Image.Rotation = rotatePlaced(deg, w, h, el.Image.X, el.Image.Y, el.Image.Width, el.Image.Height, el.Image.Rotation)
 		case el.Shape != nil:
-			el.Shape.X, el.Shape.Y, el.Shape.Width, el.Shape.Height = rotateBox(deg, w, h, el.Shape.X, el.Shape.Y, el.Shape.Width, el.Shape.Height)
-			// Path commands are in the pre-rotation local space. A swapped
-			// box without rewriting the path would distort curves, so rotated
-			// non-rect shapes fall back to their axis-aligned bounds as rects.
-			if deg != 180 && !el.Shape.SimpleRect {
-				el.Shape.SimpleRect = true
-				el.Shape.Path = nil
-			}
+			rotateShape(deg, w, h, el.Shape)
+		}
+	}
+}
+
+// rotatePlaced turns an object that DrawingML rotates around its center.
+// Width and height stay in the object's own axes.
+func rotatePlaced(deg int, pageW, pageH, x, y, w, h, rot float64) (float64, float64, float64, float64, float64) {
+	cx, cy := x+w/2, y+h/2
+	nx, ny := mapPoint(deg, pageW, pageH, cx, cy)
+	return nx - w/2, ny - h/2, w, h, normRot(rot + float64(deg))
+}
+
+// mapPoint rotates a y-down page point clockwise into the displayed page.
+func mapPoint(deg int, pageW, pageH, x, y float64) (float64, float64) {
+	switch deg {
+	case 90:
+		return pageH - y, x
+	case 270:
+		return y, pageW - x
+	case 180:
+		return pageW - x, pageH - y
+	default:
+		return x, y
+	}
+}
+
+func normRot(d float64) float64 {
+	d = math.Mod(d, 360)
+	if d < 0 {
+		d += 360
+	}
+	if d < 0.05 || d > 359.95 {
+		return 0
+	}
+	return d
+}
+
+func rotateShape(deg int, pageW, pageH float64, sh *ShapeObject) {
+	if len(sh.Path) == 0 || sh.SimpleRect {
+		sh.X, sh.Y, sh.Width, sh.Height = rotateBox(deg, pageW, pageH, sh.X, sh.Y, sh.Width, sh.Height)
+		return
+	}
+	minX, minY := math.Inf(1), math.Inf(1)
+	maxX, maxY := math.Inf(-1), math.Inf(-1)
+	consider := func(lx, ly float64) {
+		x, y := mapPoint(deg, pageW, pageH, sh.X+lx, sh.Y+ly)
+		if x < minX {
+			minX = x
+		}
+		if y < minY {
+			minY = y
+		}
+		if x > maxX {
+			maxX = x
+		}
+		if y > maxY {
+			maxY = y
+		}
+	}
+	for _, op := range sh.Path {
+		switch op.Op {
+		case "M", "L":
+			consider(op.X, op.Y)
+		case "C":
+			consider(op.X, op.Y)
+			consider(op.X1, op.Y1)
+			consider(op.X2, op.Y2)
+		}
+	}
+	if minX > maxX {
+		sh.X, sh.Y, sh.Width, sh.Height = rotateBox(deg, pageW, pageH, sh.X, sh.Y, sh.Width, sh.Height)
+		sh.SimpleRect = true
+		sh.Path = nil
+		return
+	}
+	rel := func(lx, ly float64) (float64, float64) {
+		x, y := mapPoint(deg, pageW, pageH, sh.X+lx, sh.Y+ly)
+		return x - minX, y - minY
+	}
+	for i, op := range sh.Path {
+		switch op.Op {
+		case "M", "L":
+			sh.Path[i].X, sh.Path[i].Y = rel(op.X, op.Y)
+		case "C":
+			sh.Path[i].X, sh.Path[i].Y = rel(op.X, op.Y)
+			sh.Path[i].X1, sh.Path[i].Y1 = rel(op.X1, op.Y1)
+			sh.Path[i].X2, sh.Path[i].Y2 = rel(op.X2, op.Y2)
+		}
+	}
+	sh.X, sh.Y = minX, minY
+	sh.Width, sh.Height = maxX-minX, maxY-minY
+	if sh.Width < 0.4 {
+		sh.Width = 0.4
+	}
+	if sh.Height < 0.4 {
+		sh.Height = 0.4
+	}
+}
+
+func (p *Page) syncLists() {
+	p.TextObjects = nil
+	p.Images = nil
+	for i := range p.Elements {
+		el := &p.Elements[i]
+		if el.Text != nil {
+			p.TextObjects = append(p.TextObjects, el.Text)
+		}
+		if el.Image != nil {
+			p.Images = append(p.Images, el.Image)
 		}
 	}
 }

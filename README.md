@@ -41,7 +41,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.3.4
+pdf2ppt 1.3.5
 usage: pdf2ppt input.pdf output.pptx
 ```
 
@@ -98,12 +98,20 @@ python3 tests/corpus/fetch.py
 go test ./converter -run 'TestRoundTrip|TestChromeSkiaSlide' -count=1 -timeout 20m
 ```
 
+On Windows, with PowerPoint installed:
+
+```powershell
+powershell -STA -File tools/ppt-verify.ps1 -Path deck.pptx -Slides 1,23 -OutDir ppt-verify
+```
+
+That opens the file in PowerPoint, prints the slide count and size, and writes one PNG per requested slide. A repair or a hung dialog is a failure.
+
 On the decks that were checked, PowerPoint and Keynote pages keep their pictures and layout. Accented text (Catalan à è é í ó) needed WinAnsi, which PowerPoint uses when there is no ToUnicode map. Chrome/Skia gradients are axial shadings; rotated text is a real rotated text box. PowerPoint 2013 often stores the slide background as a one-image tiling pattern; that photo is placed on the slide instead of a black page. Wingdings private-use arrows become Unicode arrows. `tests/corpus/COMPATIBILITY.md` has the per-deck SSIM table. No redistributable WPS Presentation export was found.
 
 ## Known limitations
 
 - **One slide size per file.** OOXML stores a single `sldSz`. That size is the most common page size. When two sizes are equally common, the first page wins. A page of a different size is scaled down so it fits, keeping its aspect ratio, and centered. It is not stretched, and a smaller page is not enlarged. The extra margin is a letterbox.
-- **Text is one box per PDF text run.** A wrapped paragraph or a mixed Latin/Chinese line usually comes back as several boxes on the same baseline, not as the original single text frame. The characters and their positions are preserved.
+- **Text is one box per visual line.** Runs that share a baseline and sit next to each other become one text box, with a new run where the style changes. A wrapped paragraph is still one box per line. A wide gap, such as two columns, stays two boxes.
 - **Tables and bullets are not native PowerPoint objects.** A table comes back as cell rectangles plus text boxes. A bullet list comes back as a bullet character and a text box per line. Both stay editable.
 - **Preset shapes are outlines.** Rectangles stay rectangles. Ovals, rounded rectangles, diamonds, and arbitrary curves become freeform geometry that matches the PDF path. Drop shadows that LibreOffice rasterizes are kept as images.
 - **Baseline placement assumes a horizontal run.** The box is positioned so LibreOffice draws the baseline on the PDF baseline. Rotated text is a rotated text box. Vertical writing mode is not reconstructed.

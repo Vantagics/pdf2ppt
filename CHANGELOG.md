@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.5
+
+PowerPoint is the renderer these files have to satisfy. Three things LibreOffice did not show:
+
+The MIT title slide's watermark is a JPEG with a soft mask whose matte is black, so the stored pixels are already multiplied by that black. They were written out that way, at 50% alpha. PowerPoint then paints a gray page instead of the light blue-white watermark. The matte is removed before the PNG is written, and a page-sized image is composited onto the page color so the file does not depend on PNG alpha.
+
+"post-it", "top laning", and "Jossey-Bass" were several text boxes, including a hyphen whose box was wider than the glyph. PowerPoint drew a gap inside the word. Runs on one baseline that touch are now one paragraph.
+
+Page 23 is a letter page with `/Rotate 90`. The boxes were moved into the displayed page, but each text box kept its −90° angle, so PowerPoint drew the lines on their side. The page angle is added to the text, image, and path, and the glyph box stays in its own axes. The upright page is then letterboxed into the 16:9 slide.
+
+`tools/ppt-verify.ps1` opens a PPTX in PowerPoint, reports a repair error, and exports slides to PNG.
+
 ## 1.3.4
 
 Mixed page sizes used the largest width and the largest height as two separate numbers. The MIT Session 1 deck has 22 pages at 960×540. Its last page is a 612×792 letter box with `/Rotate 90`, which displays as 792×612. The deck became 960×612 (`sldSz` 12192000×7772400), a size no page has. The slide size is now the most common page, and a tie keeps the first page. A page that differs is scaled down to fit, aspect ratio kept, and centered. The MIT deck is 960×540 pt, `sldSz cx="12192000" cy="6858000"`.

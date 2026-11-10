@@ -39,7 +39,7 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 		return nil, "", nil
 	}
 
-	smask, smW, smH, smDecode := softMask(xrd, sd.Dict)
+	smask, smW, smH, smDecode, matte := softMask(xrd, sd.Dict)
 	decode := decodeArray(xrd, sd.Dict)
 	invert := decodeInverts(decode, ncomp)
 	needPixels := smask != nil || opacity < 0.999 || invert || csName != "rgb" || bpc != 8
@@ -73,7 +73,14 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 			if opacity < 0.999 {
 				alpha = byte(float64(alpha) * opacity)
 			}
-			out.SetNRGBA(x, y, color.NRGBA{R: byte(r >> 8), G: byte(g >> 8), B: byte(bv >> 8), A: alpha})
+			rr, gg, bb := byte(r>>8), byte(g>>8), byte(bv>>8)
+			// An SMask Matte means the color was premultiplied with that
+			// color. Leaving it premultiplied paints the matte (black, for
+			// these slides) a second time, so a light watermark becomes gray.
+			if len(matte) > 0 {
+				rr, gg, bb = unmatte(rr, gg, bb, alpha, matte)
+			}
+			out.SetNRGBA(x, y, color.NRGBA{R: rr, G: gg, B: bb, A: alpha})
 		}
 	}
 	var buf bytes.Buffer
@@ -229,25 +236,26 @@ func decodeInverts(dec []float64, ncomp int) bool {
 	return false
 }
 
-func softMask(xrd *model.XRefTable, d types.Dict) (samples []byte, w, h int, dec []float64) {
+func softMask(xrd *model.XRefTable, d types.Dict) (samples []byte, w, h int, dec, matte []float64) {
 	o, ok := d.Find("SMask")
 	if !ok || o == nil {
-		return nil, 0, 0, nil
+		return nil, 0, 0, nil, nil
 	}
 	sd, _, err := xrd.DereferenceStreamDict(o)
 	if err != nil || sd == nil {
-		return nil, 0, 0, nil
+		return nil, 0, 0, nil, nil
 	}
 	w = intEntry(xrd, sd.Dict, "Width")
 	h = intEntry(xrd, sd.Dict, "Height")
+	matte = numberList(xrd, sd.Dict["Matte"])
 	if err := sd.Decode(); err != nil {
-		return nil, 0, 0, nil
+		return nil, 0, 0, nil, nil
 	}
 	data := sd.Content
 	if isJPEG(data) {
 		img, err := jpeg.Decode(bytes.NewReader(data))
 		if err != nil {
-			return nil, 0, 0, nil
+			return nil, 0, 0, nil, nil
 		}
 		b := img.Bounds()
 		samples = make([]byte, b.Dx()*b.Dy())
@@ -263,7 +271,88 @@ func softMask(xrd *model.XRefTable, d types.Dict) (samples []byte, w, h int, dec
 	} else {
 		samples = data
 	}
-	return samples, w, h, decodeArray(xrd, sd.Dict)
+	return samples, w, h, decodeArray(xrd, sd.Dict), matte
+}
+
+// unmatte reverses PDF soft-mask premultiplication:
+// stored = matte + alpha*(straight - matte).
+func unmatte(r, g, b, alpha byte, matte []float64) (byte, byte, byte) {
+	if alpha == 0 || len(matte) == 0 {
+		return r, g, b
+	}
+	a := float64(alpha) / 255
+	comp := func(sample byte, m float64) byte {
+		v := (float64(sample)/255 - (1-a)*m) / a
+		if v < 0 {
+			v = 0
+		}
+		if v > 1 {
+			v = 1
+		}
+		return byte(math.Round(v * 255))
+	}
+	if len(matte) == 1 {
+		v := comp(r, matte[0])
+		return v, v, v
+	}
+	mr, mg, mb := matte[0], 0.0, 0.0
+	if len(matte) > 1 {
+		mg = matte[1]
+	}
+	if len(matte) > 2 {
+		mb = matte[2]
+	}
+	return comp(r, mr), comp(g, mg), comp(b, mb)
+}
+
+func numberList(xrd *model.XRefTable, o types.Object) []float64 {
+	if o == nil {
+		return nil
+	}
+	arr, err := xrd.DereferenceArray(o)
+	if err != nil || len(arr) == 0 {
+		return nil
+	}
+	out := make([]float64, 0, len(arr))
+	for _, el := range arr {
+		if n, ok := objNum(xrd, el); ok {
+			out = append(out, n)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// flattenOn composites a PNG onto a solid color and returns an opaque PNG.
+// PowerPoint has composited PNG alpha against black, which turns a
+// translucent light watermark into a gray page.
+func flattenOn(data []byte, bgR, bgG, bgB byte) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	b := img.Bounds()
+	out := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			// NRGBAModel yields straight alpha. color.Color.RGBA is premultiplied.
+			c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			af := float64(c.A) / 255
+			out.SetNRGBA(x-b.Min.X, y-b.Min.Y, color.NRGBA{
+				R: byte(math.Round(float64(c.R)*af + float64(bgR)*(1-af))),
+				G: byte(math.Round(float64(c.G)*af + float64(bgG)*(1-af))),
+				B: byte(math.Round(float64(c.B)*af + float64(bgB)*(1-af))),
+				A: 255,
+			})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, out); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func maskAlpha(samples []byte, w, h int, dec []float64, x, y, dstW, dstH int) byte {

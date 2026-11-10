@@ -41,7 +41,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.3.4
+pdf2ppt 1.3.5
 usage: pdf2ppt input.pdf output.pptx
 ```
 
@@ -98,12 +98,20 @@ python3 tests/corpus/fetch.py
 go test ./converter -run 'TestRoundTrip|TestChromeSkiaSlide' -count=1 -timeout 20m
 ```
 
+在装了 PowerPoint 的 Windows 上：
+
+```powershell
+powershell -STA -File tools/ppt-verify.ps1 -Path deck.pptx -Slides 1,23 -OutDir ppt-verify
+```
+
+这条命令用 PowerPoint 打开文件，打印幻灯片数量和尺寸，并按要求把每一页导出成 PNG。需要修复，或对话框一直不消失，都算失败。
+
 已经核对过的 PowerPoint 和 Keynote 页面能保住图片和版式。加泰罗尼亚语里的 à è é í ó 需要 WinAnsi，因为 PowerPoint 在没有 ToUnicode 时用的就是这种编码。Chrome/Skia 的渐变是轴向着色；旋转的文字是真正旋转的文本框。PowerPoint 2013 经常把幻灯片背景存成只有一张图的平铺图案，这张照片会铺到幻灯片上，而不是变成黑底。Wingdings 的专用区箭头会变成 Unicode 箭头。每份文稿的 SSIM 表在 `tests/corpus/COMPATIBILITY.md`。没有找到可以再分发的 WPS 演示文稿导出文件。
 
 ## 已知限制
 
 - **一份文件只有一个幻灯片尺寸。** OOXML 只存一个 `sldSz`。这个尺寸取出现次数最多的页面；次数相同则用第一页。尺寸不同的页按原比例缩小后居中放到这张幻灯片上，不拉伸，较小的页也不放大。多出来的边是留白（letterbox）。
-- **一段 PDF 文字对应一个文本框。** 自动换行的段落，或同一行里中英混排，通常会变成同一基线上的好几个框，而不是原来的那一个文本框。字符和位置还在。
+- **一行文字一个文本框。** 同一基线上、彼此挨着的几段文字合成一个文本框；样式变了就在框里另起一段文字。自动换行的段落仍然是每行一个框。间隔很大的两段（例如两栏）仍然是两个框。
 - **表格和项目符号不是 PowerPoint 的原生对象。** 表格是单元格矩形加上文本框。项目符号是符号字符加上每行一个文本框。两者都可以继续编辑。
 - **预设形状是轮廓。** 矩形仍然是矩形。椭圆、圆角矩形、菱形和其他曲线会变成与 PDF 路径一致的自由形状。LibreOffice 栅格化的投影会保留成图片。
 - **基线按水平文字来放。** 文本框的位置让 LibreOffice 把基线画在 PDF 的基线上。旋转过的文字是旋转的文本框。竖排书写模式不会重建。

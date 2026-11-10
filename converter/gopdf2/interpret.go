@@ -1643,6 +1643,17 @@ func (ip *interp) paintImage(xo *xobject) {
 	if err != nil || len(data) == 0 {
 		return
 	}
+	// A page-sized translucent image is the slide background. Bake it onto
+	// the page color so PowerPoint cannot composite the PNG alpha against black.
+	if ip.coversPage(minX, minY, maxX, maxY) {
+		br, bgc, bb := byte(255), byte(255), byte(255)
+		if ip.hasBg && ip.bgGrad == nil {
+			br, bgc, bb = ip.bg.bytes()
+		}
+		if flat, ferr := flattenOn(data, br, bgc, bb); ferr == nil && len(flat) > 0 {
+			data, format = flat, "png"
+		}
+	}
 	img := &ImageObject{
 		Data:   data,
 		Format: format,

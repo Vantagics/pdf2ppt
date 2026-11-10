@@ -51,6 +51,20 @@ type TextBox struct {
 	StrokeB     uint8
 	StrokeWidth float64 // points
 	Tracking    float64 // extra points between glyphs; negative tightens
+	Runs        []TextRun
+}
+
+// TextRun is one style span in a text box paragraph.
+type TextRun struct {
+	Content  string
+	FontName string
+	FontSize float64
+	Bold     bool
+	Italic   bool
+	ColorR   uint8
+	ColorG   uint8
+	ColorB   uint8
+	Tracking float64
 }
 
 // PathOp is a shape-local path command. Coordinates are EMU, y grows down.
@@ -93,12 +107,13 @@ func (t *TextBox) elementType() string { return "textbox" }
 
 // Image represents an image element on a slide.
 type Image struct {
-	Data   []byte
-	Format string // "png", "jpeg", etc.
-	X      int64  // Position X in EMU
-	Y      int64  // Position Y in EMU
-	Width  int64  // Width in EMU
-	Height int64  // Height in EMU
+	Data     []byte
+	Format   string  // "png", "jpeg", etc.
+	X        int64   // Position X in EMU
+	Y        int64   // Position Y in EMU
+	Width    int64   // Width in EMU
+	Height   int64   // Height in EMU
+	Rotation float64 // clockwise degrees
 }
 
 func (i *Image) elementType() string { return "image" }

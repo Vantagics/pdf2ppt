@@ -78,6 +78,10 @@ func scaleElement(el Element, scale, ox, oy float64) {
 		e.FontSize *= scale
 		e.StrokeWidth *= scale
 		e.Tracking *= scale
+		for i := range e.Runs {
+			e.Runs[i].FontSize *= scale
+			e.Runs[i].Tracking *= scale
+		}
 	case *Image:
 		e.X, e.Y, e.Width, e.Height = mapBox(e.X, e.Y, e.Width, e.Height, scale, ox, oy)
 	case *Shape:

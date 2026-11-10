@@ -23,26 +23,39 @@ const (
 
 // TextElement 从 PDF 页面中提取的文本元素
 type TextElement struct {
-	Content     string  `json:"content"`
-	FontName    string  `json:"fontName"`
-	FontSize    float64 `json:"fontSize"`
-	ColorR      uint8   `json:"colorR"`
-	ColorG      uint8   `json:"colorG"`
-	ColorB      uint8   `json:"colorB"`
-	Bold        bool    `json:"bold"`
-	Italic      bool    `json:"italic"`
-	X           float64 `json:"x"`
-	Y           float64 `json:"y"`
-	Width       float64 `json:"width"`
-	Height      float64 `json:"height"`
-	Rotation    float64 `json:"rotation,omitempty"`
-	Stroke      bool    `json:"stroke,omitempty"`
-	StrokeOnly  bool    `json:"strokeOnly,omitempty"`
-	StrokeR     uint8   `json:"strokeR,omitempty"`
-	StrokeG     uint8   `json:"strokeG,omitempty"`
-	StrokeB     uint8   `json:"strokeB,omitempty"`
-	StrokeWidth float64 `json:"strokeWidth,omitempty"`
-	Tracking    float64 `json:"tracking,omitempty"`
+	Content     string    `json:"content"`
+	FontName    string    `json:"fontName"`
+	FontSize    float64   `json:"fontSize"`
+	ColorR      uint8     `json:"colorR"`
+	ColorG      uint8     `json:"colorG"`
+	ColorB      uint8     `json:"colorB"`
+	Bold        bool      `json:"bold"`
+	Italic      bool      `json:"italic"`
+	X           float64   `json:"x"`
+	Y           float64   `json:"y"`
+	Width       float64   `json:"width"`
+	Height      float64   `json:"height"`
+	Rotation    float64   `json:"rotation,omitempty"`
+	Stroke      bool      `json:"stroke,omitempty"`
+	StrokeOnly  bool      `json:"strokeOnly,omitempty"`
+	StrokeR     uint8     `json:"strokeR,omitempty"`
+	StrokeG     uint8     `json:"strokeG,omitempty"`
+	StrokeB     uint8     `json:"strokeB,omitempty"`
+	StrokeWidth float64   `json:"strokeWidth,omitempty"`
+	Tracking    float64   `json:"tracking,omitempty"`
+	Runs        []TextRun `json:"runs,omitempty"`
+}
+
+// TextRun is one style span inside a line that was merged into one text box.
+type TextRun struct {
+	Content  string  `json:"content"`
+	FontName string  `json:"fontName"`
+	FontSize float64 `json:"fontSize"`
+	Bold     bool    `json:"bold,omitempty"`
+	Italic   bool    `json:"italic,omitempty"`
+	ColorR   uint8   `json:"colorR"`
+	ColorG   uint8   `json:"colorG"`
+	ColorB   uint8   `json:"colorB"`
 }
 
 // PathOp is one command of a vector outline. Coordinates are in points,
@@ -104,12 +117,13 @@ type PageElement struct {
 
 // ImageElement 从 PDF 页面中提取的图片元素
 type ImageElement struct {
-	Data   []byte  `json:"-"`
-	Format string  `json:"format"`
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Width  float64 `json:"width"`
-	Height float64 `json:"height"`
+	Data     []byte  `json:"-"`
+	Format   string  `json:"format"`
+	X        float64 `json:"x"`
+	Y        float64 `json:"y"`
+	Width    float64 `json:"width"`
+	Height   float64 `json:"height"`
+	Rotation float64 `json:"rotation,omitempty"`
 }
 
 // PageContent 一个 PDF 页面中提取的所有元素集合.

@@ -130,6 +130,13 @@ func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 		StrokeWidth: textObj.StrokeWidth,
 		Tracking:    textObj.Tracking,
 	}
+	for _, r := range textObj.Runs {
+		elem.Runs = append(elem.Runs, TextRun{
+			Content: r.Content, FontName: r.FontName, FontSize: r.FontSize,
+			Bold: r.Bold, Italic: r.Italic,
+			ColorR: r.ColorR, ColorG: r.ColorG, ColorB: r.ColorB,
+		})
+	}
 	if elem.FontName == "" {
 		elem.FontName = DefaultFontName
 	}
@@ -147,12 +154,13 @@ func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 
 func imageFromPDF(imgObj *gopdf2.ImageObject) ImageElement {
 	return ImageElement{
-		Data:   imgObj.Data,
-		Format: imgObj.Format,
-		X:      imgObj.X,
-		Y:      imgObj.Y,
-		Width:  imgObj.Width,
-		Height: imgObj.Height,
+		Data:     imgObj.Data,
+		Format:   imgObj.Format,
+		X:        imgObj.X,
+		Y:        imgObj.Y,
+		Width:    imgObj.Width,
+		Height:   imgObj.Height,
+		Rotation: imgObj.Rotation,
 	}
 }
 

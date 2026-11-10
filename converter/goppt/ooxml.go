@@ -155,24 +155,6 @@ func writeSlideXML(w *zip.Writer, slide *Slide, slideNum int) error {
 }
 
 func formatTextBox(tb *TextBox, id int) string {
-	colorHex := fmt.Sprintf("%02X%02X%02X", tb.ColorR, tb.ColorG, tb.ColorB)
-	fontSize := int(math.Round(tb.FontSize * 100)) // hundredths of a point
-	if fontSize < 100 {
-		fontSize = 100
-	}
-	lang := "en-US"
-	if containsCJK(tb.Content) {
-		lang = "zh-CN"
-	}
-	b := "0"
-	if tb.Bold {
-		b = "1"
-	}
-	i := "0"
-	if tb.Italic {
-		i = "1"
-	}
-
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(`<p:sp><p:nvSpPr><p:cNvPr id="%d" name="TextBox %d"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>`, id, id))
 	rot := ""
@@ -195,7 +177,44 @@ func formatTextBox(tb *TextBox, id int) string {
 	// 100% line spacing keeps the first baseline on the font's em box. The
 	// default (omitted) spacing adds external leading and drops the glyphs.
 	sb.WriteString(`<a:p><a:pPr marL="0" indent="0"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:buNone/></a:pPr>`)
-	// CT_TextCharacterProperties requires a:ln before the fill.
+	for _, run := range textRuns(tb) {
+		sb.WriteString(formatTextRun(tb, run))
+	}
+	sb.WriteString(`</a:p></p:txBody></p:sp>`)
+	return sb.String()
+}
+
+func textRuns(tb *TextBox) []TextRun {
+	if len(tb.Runs) > 0 {
+		return tb.Runs
+	}
+	return []TextRun{{
+		Content: tb.Content, FontName: tb.FontName, FontSize: tb.FontSize,
+		Bold: tb.Bold, Italic: tb.Italic,
+		ColorR: tb.ColorR, ColorG: tb.ColorG, ColorB: tb.ColorB,
+		Tracking: tb.Tracking,
+	}}
+}
+
+func formatTextRun(tb *TextBox, run TextRun) string {
+	fontSize := int(math.Round(run.FontSize * 100))
+	if fontSize < 100 {
+		fontSize = 100
+	}
+	if fontSize > 400000 {
+		fontSize = 400000
+	}
+	lang := "en-US"
+	if containsCJK(run.Content) {
+		lang = "zh-CN"
+	}
+	b, i := "0", "0"
+	if run.Bold {
+		b = "1"
+	}
+	if run.Italic {
+		i = "1"
+	}
 	var line string
 	if tb.Stroke && tb.StrokeWidth > 0.05 {
 		lw := int(math.Round(tb.StrokeWidth * 12700))
@@ -207,13 +226,13 @@ func formatTextBox(tb *TextBox, id int) string {
 		}
 		line = fmt.Sprintf(`<a:ln w="%d" cap="rnd" cmpd="sng"><a:solidFill><a:srgbClr val="%02X%02X%02X"/></a:solidFill><a:prstDash val="solid"/><a:round/></a:ln>`, lw, tb.StrokeR, tb.StrokeG, tb.StrokeB)
 	}
-	fill := fmt.Sprintf(`<a:solidFill><a:srgbClr val="%s"/></a:solidFill>`, colorHex)
+	fill := fmt.Sprintf(`<a:solidFill><a:srgbClr val="%02X%02X%02X"/></a:solidFill>`, run.ColorR, run.ColorG, run.ColorB)
 	if tb.StrokeOnly {
 		fill = `<a:noFill/>`
 	}
 	spc := ""
-	if math.Abs(tb.Tracking) > 0.01 {
-		sp := int(math.Round(tb.Tracking * 100))
+	if math.Abs(run.Tracking) > 0.01 {
+		sp := int(math.Round(run.Tracking * 100))
 		if sp < -400000 {
 			sp = -400000
 		}
@@ -222,16 +241,13 @@ func formatTextBox(tb *TextBox, id int) string {
 		}
 		spc = fmt.Sprintf(` spc="%d"`, sp)
 	}
-	if fontSize > 400000 {
-		fontSize = 400000
-	}
+	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s"%s dirty="0">%s%s`, lang, fontSize, b, i, spc, line, fill))
-	if tb.FontName != "" {
-		name := escapeXML(tb.FontName)
+	if run.FontName != "" {
+		name := escapeXML(run.FontName)
 		sb.WriteString(fmt.Sprintf(`<a:latin typeface="%s"/><a:ea typeface="%s"/><a:cs typeface="%s"/>`, name, name, name))
 	}
-	sb.WriteString(fmt.Sprintf(`</a:rPr><a:t>%s</a:t></a:r></a:p>`, escapeXML(tb.Content)))
-	sb.WriteString(`</p:txBody></p:sp>`)
+	sb.WriteString(fmt.Sprintf(`</a:rPr><a:t>%s</a:t></a:r>`, escapeXML(run.Content)))
 	return sb.String()
 }
 
@@ -368,7 +384,18 @@ func formatImage(img *Image, id int, imageIdx int) string {
 	sb.WriteString(fmt.Sprintf(`<p:pic><p:nvPicPr><p:cNvPr id="%d" name="Image %d"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`, id, id))
 	sb.WriteString(fmt.Sprintf(`<p:blipFill><a:blip r:embed="rImg%d"/>`, imageIdx))
 	sb.WriteString(`<a:stretch><a:fillRect/></a:stretch></p:blipFill>`)
-	sb.WriteString(fmt.Sprintf(`<p:spPr><a:xfrm><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, img.X, img.Y, clampExtent(img.Width), clampExtent(img.Height)))
+	rot := ""
+	if math.Abs(img.Rotation) > 0.4 {
+		deg := img.Rotation
+		for deg < 0 {
+			deg += 360
+		}
+		for deg >= 360 {
+			deg -= 360
+		}
+		rot = fmt.Sprintf(` rot="%d"`, int64(math.Round(deg*60000)))
+	}
+	sb.WriteString(fmt.Sprintf(`<p:spPr><a:xfrm%s><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, rot, img.X, img.Y, clampExtent(img.Width), clampExtent(img.Height)))
 	sb.WriteString(`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`)
 	return sb.String()
 }

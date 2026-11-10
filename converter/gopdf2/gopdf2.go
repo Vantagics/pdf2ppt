@@ -64,16 +64,32 @@ type TextObject struct {
 	// Tracking is extra space between glyphs, in points. Negative tightens
 	// a fallback font so the run stays inside the PDF advance.
 	Tracking float64
+	// Runs is set when several PDF runs on one line were merged into this
+	// box. Content is the concatenation. Empty means a single run.
+	Runs []TextRun
+}
+
+// TextRun is one style span inside a merged line.
+type TextRun struct {
+	Content  string
+	FontName string
+	FontSize float64
+	Bold     bool
+	Italic   bool
+	ColorR   uint8
+	ColorG   uint8
+	ColorB   uint8
 }
 
 // ImageObject is a raster image placed on the page.
 type ImageObject struct {
-	Data   []byte
-	Format string // "png" or "jpeg"
-	X      float64
-	Y      float64
-	Width  float64
-	Height float64
+	Data     []byte
+	Format   string // "png" or "jpeg"
+	X        float64
+	Y        float64
+	Width    float64
+	Height   float64
+	Rotation float64 // clockwise degrees, matching DrawingML
 }
 
 // PathOp is one command of a shape outline in shape-local, y-down points.

@@ -80,18 +80,26 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				StrokeWidth: te.StrokeWidth,
 				Tracking:    te.Tracking,
 			}
+			for _, r := range te.Runs {
+				tb.Runs = append(tb.Runs, goppt.TextRun{
+					Content: r.Content, FontName: r.FontName, FontSize: r.FontSize,
+					Bold: r.Bold, Italic: r.Italic,
+					ColorR: r.ColorR, ColorG: r.ColorG, ColorB: r.ColorB,
+				})
+			}
 			if err := slide.AddTextBox(tb); err != nil {
 				log.Printf("warning: failed to add text box %d: %v", i, err)
 			}
 		case el.Image != nil:
 			ie := el.Image
 			img := &goppt.Image{
-				Data:   ie.Data,
-				Format: ie.Format,
-				X:      PointsToEMU(ie.X),
-				Y:      PointsToEMU(ie.Y),
-				Width:  PointsToEMU(ie.Width),
-				Height: PointsToEMU(ie.Height),
+				Data:     ie.Data,
+				Format:   ie.Format,
+				X:        PointsToEMU(ie.X),
+				Y:        PointsToEMU(ie.Y),
+				Width:    PointsToEMU(ie.Width),
+				Height:   PointsToEMU(ie.Height),
+				Rotation: ie.Rotation,
 			}
 			if err := slide.AddImage(img); err != nil {
 				log.Printf("warning: failed to add image %d: %v", i, err)

@@ -22,9 +22,10 @@ func TestDominantSizeTieUsesFirstPage(t *testing.T) {
 	}
 }
 
-func TestSlightlyTallerPageFillsTheWidth(t *testing.T) {
+func TestSlightlyTallerPageStaysInside(t *testing.T) {
 	p := NewPresentation()
 	// 777.6 x 604.32 pt, twice, then one page 777.6 x 657.12 pt.
+	// The odd page is fitted inside. Cropping it cut the logo.
 	p.AddSlide(9875520, 7674864)
 	p.AddSlide(9875520, 7674864)
 	odd := p.AddSlide(9875520, 8345424)
@@ -40,11 +41,16 @@ func TestSlightlyTallerPageFillsTheWidth(t *testing.T) {
 	if !ok {
 		t.Fatalf("element %#v", s.Elements[0])
 	}
-	if img.Width < 9800000 {
-		t.Fatalf("page shrank to width %d, want the slide filled", img.Width)
+	if img.X < -100 || img.Y < -100 || img.X+img.Width > s.Width+100 || img.Y+img.Height > s.Height+100 {
+		t.Fatalf("image leaves the slide: %d,%d %dx%d slide %dx%d", img.X, img.Y, img.Width, img.Height, s.Width, s.Height)
 	}
-	if img.Y >= 0 {
-		t.Fatalf("extra height was letterboxed, y=%d", img.Y)
+	// Height is the limit, so the page fills the slide height and the
+	// side bars are the letterbox. Nothing hangs off the top or bottom.
+	if img.X < 1000 || img.X+img.Width > s.Width-1000 {
+		t.Fatalf("no side letterbox: x=%d width=%d slide=%d", img.X, img.Width, s.Width)
+	}
+	if img.Height > s.Height+100 {
+		t.Fatalf("height still overflows: %d slide %d", img.Height, s.Height)
 	}
 }
 

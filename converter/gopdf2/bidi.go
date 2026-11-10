@@ -62,12 +62,12 @@ func hasRTLScript(s string) bool {
 	return false
 }
 
-// joinCloseRTLPairs joins two neighboring runs whose boxes almost touch.
-// Merge walks left to right, so "בניש" (left) was glued in front of
-// "אילנה" (right) and "1,600,000" landed in front of בישראל. The right-hand
-// run is the one that comes first in reading order. A wide overlap is a
-// whole line whose own spaces already match the v1.5.0 text, and joining
-// it dropped those words.
+// joinCloseRTLPairs rebuilds one RTL line in reading order.
+// Fragments are already logical. Visual order is left to right, so the
+// paragraph is the right-hand fragment first. A colon is a neutral and
+// stays against the word on its right ("הישראלי:"). A European number is
+// a weak LTR run and keeps its digits ("מעל ל 50"). Pairing only the
+// boxes that almost touched left "מעל ל" on the wrong side of the name.
 func joinCloseRTLPairs(p *Page) {
 	var refs []textRef
 	for i := range p.Elements {
@@ -87,20 +87,40 @@ func joinCloseRTLPairs(p *Page) {
 		for j < len(refs) && sameLine(refs[i].t, refs[j].t) {
 			j++
 		}
-		line := refs[i:j]
+		line := append([]textRef(nil), refs[i:j]...)
 		i = j
-		for k := 0; k+1 < len(line); k++ {
-			a, b := line[k].t, line[k+1].t
-			if remove[line[k].i] || remove[line[k+1].i] {
+		if len(line) < 2 || !lineHasRTL(line) {
+			continue
+		}
+		var groups [][]textRef
+		for _, r := range line {
+			if len(groups) == 0 {
+				groups = append(groups, []textRef{r})
 				continue
 			}
-			if !closeRTLPair(a, b) {
+			prev := groups[len(groups)-1]
+			last := prev[len(prev)-1].t
+			gap := r.t.X - (last.X + last.Width)
+			em := math.Max(last.FontSize, r.t.FontSize)
+			if em < 1 {
+				em = 12
+			}
+			// A wide positive gap is the next column. An overlap is just
+			// a box that is wider than its ink.
+			if gap > em*2 {
+				groups = append(groups, []textRef{r})
 				continue
 			}
-			// b is to the right of a.
-			p.Elements[line[k].i].Text = joinRTLPair(b, a)
-			remove[line[k+1].i] = true
-			line[k].t = p.Elements[line[k].i].Text
+			groups[len(groups)-1] = append(prev, r)
+		}
+		for _, g := range groups {
+			if len(g) < 2 || !lineHasRTL(g) {
+				continue
+			}
+			p.Elements[g[0].i].Text = joinRTLReading(g)
+			for _, r := range g[1:] {
+				remove[r.i] = true
+			}
 		}
 	}
 	if len(remove) == 0 {
@@ -116,42 +136,98 @@ func joinCloseRTLPairs(p *Page) {
 	p.Elements = kept
 }
 
-func closeRTLPair(left, right *TextObject) bool {
-	if !hasRTLScript(left.Content) && !hasRTLScript(right.Content) {
-		return false
+func lineHasRTL(line []textRef) bool {
+	for _, r := range line {
+		if r.t.RTL || hasRTLScript(r.t.Content) {
+			return true
+		}
 	}
-	if utf8.RuneCountInString(strings.TrimSpace(left.Content)) < 2 || utf8.RuneCountInString(strings.TrimSpace(right.Content)) < 2 {
-		return false
-	}
-	gap := right.X - (left.X + left.Width)
-	em := math.Max(left.FontSize, right.FontSize)
-	if em < 1 {
-		em = 12
-	}
-	return gap > -0.3*em && gap < 0.55*em
+	return false
 }
 
-func joinRTLPair(right, left *TextObject) *TextObject {
-	out := *right
-	rs := strings.TrimSpace(right.Content)
-	ls := strings.TrimSpace(left.Content)
-	out.Content = rs + " " + ls
+func joinRTLReading(g []textRef) *TextObject {
+	items := make([]*TextObject, len(g))
+	for i := range g {
+		items[i] = g[i].t
+	}
+	best := items[0]
+	for _, t := range items[1:] {
+		if utf8.RuneCountInString(strings.TrimSpace(t.Content)) > utf8.RuneCountInString(strings.TrimSpace(best.Content)) {
+			best = t
+		}
+	}
+	var b strings.Builder
+	var prev *TextObject
+	for i := len(items) - 1; i >= 0; i-- {
+		t := items[i]
+		piece := strings.TrimSpace(t.Content)
+		if piece == "" {
+			continue
+		}
+		if prev != nil && rtlWordSeparator(prev, t) {
+			b.WriteByte(' ')
+		}
+		b.WriteString(piece)
+		prev = t
+	}
+	out := *best
+	out.Content = b.String()
 	out.RTL = true
 	out.Runs = nil
 	out.holdX = true
-	if left.X < out.X {
-		out.X = left.X
+	minX, minY := items[0].X, items[0].Y
+	maxR, maxB := items[0].X+items[0].Width, items[0].Y+items[0].Height
+	for _, t := range items[1:] {
+		if t.X < minX {
+			minX = t.X
+		}
+		if t.X+t.Width > maxR {
+			maxR = t.X + t.Width
+		}
+		if t.Y < minY {
+			minY = t.Y
+		}
+		if t.Y+t.Height > maxB {
+			maxB = t.Y + t.Height
+		}
 	}
-	r := right.X + right.Width
-	if left.X+left.Width > r {
-		r = left.X + left.Width
-	}
-	out.Width = r - out.X
-	if left.Y < out.Y {
-		out.Y = left.Y
-	}
-	if left.Y+left.Height > out.Y+out.Height {
-		out.Height = left.Y + left.Height - out.Y
+	out.X, out.Y = minX, minY
+	out.Width, out.Height = maxR-minX, maxB-minY
+	if out.Width < 1 {
+		out.Width = 1
 	}
 	return &out
+}
+
+// rtlWordSeparator reports a word space between the fragment already
+// written (the one to the right) and the next fragment to its left.
+// A colon is a neutral: it takes the embedding direction and sticks to
+// the Hebrew word on its right. A deep overlap is one word painted
+// twice, not a missing space.
+func rtlWordSeparator(right, left *TextObject) bool {
+	piece := strings.TrimSpace(left.Content)
+	if piece == "" {
+		return false
+	}
+	if neutralPunct(piece) {
+		return false
+	}
+	gap := right.X - (left.X + left.Width)
+	shorter := math.Min(right.Width, left.Width)
+	if shorter > 1 && -gap > shorter*0.5 {
+		return false
+	}
+	return true
+}
+
+func neutralPunct(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsPunct(r) && r != ':' {
+			return false
+		}
+	}
+	return true
 }

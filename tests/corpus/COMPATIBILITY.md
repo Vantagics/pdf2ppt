@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.2
+
+`he-openu-a11y` page 2 reads `איגוד האינטרנט הישראלי: מעל ל 50`. `oicw-1996-scan` page 1 is fitted inside the slide, logo included. `canva-rotary` page 16 keeps the space between nonprofit and organizations. `wps-tutorial` page 4 reads `WPS Office`. `undp-gender-ar` page 10 body text is painted from the soft masks; that deck's size ceiling is the 10.8 MB file.
+
 ## v1.5.1
 
 `jp-tategaki` page 1 is two `vert="eaVert"` columns, あいうえお on the right and 日本語 on the left, each taller than it is wide. `he-openu-a11y` page 1 reads אילנה בניש, and page 2 keeps 1,600,000, BCG, and 50 in `pdftotext -layout` order. `oicw-1996-scan` stays at or under the PDF size × 1.05 (21.0 MB from a 22.5 MB PDF). Page 1 fills the slide width. `wps-office2019` page 1 is one "WPS Office 2019" line, and the subtitle is not covered by white rectangles. `undp-gender-ar` page 10 body text is a 1-bit soft mask on a 2×2 image, not extractable text.

@@ -6,9 +6,8 @@ import "math"
 // The size is the most common page. Ties keep the earlier page. A page
 // that does not match is scaled down uniformly so both sides fit, then
 // centered. A smaller page is not enlarged. Its background becomes the
-// centered page rectangle, so the margin stays a letterbox. A page that
-// already matches the slide width and is only a little taller fills that
-// width instead of shrinking onto side bars.
+// centered page rectangle, so the margin stays a letterbox. A taller
+// scan page is fitted inside too: cropping it cut off the logo.
 func (p *Presentation) fitSlides() {
 	if len(p.slides) == 0 {
 		return
@@ -32,24 +31,13 @@ func (s *Slide) fitInto(dw, dh int64) {
 		ph = 1
 	}
 	scale := 1.0
-	// A scan page that shares the slide's width and is only a little
-	// taller (OICW page 1 is 657 pt into a 604 pt slide) used to shrink
-	// onto white bars. Fill the width and let the extra height fall
-	// outside the slide, which clips it. A letter page in a 16:9 deck
-	// is nowhere near this ratio and still letterboxes.
-	if pw > 0 && ph > 0 {
-		rw := float64(dw) / float64(pw)
-		rh := float64(dh) / float64(ph)
-		if rw > 0.98 && rw < 1.02 && rh > 0.85 && rh < 1 {
-			scale = rw
-		} else {
-			if pw > dw {
-				scale = math.Min(scale, rw)
-			}
-			if ph > dh {
-				scale = math.Min(scale, rh)
-			}
-		}
+	// Fit the whole page inside the slide. Cropping a slightly taller
+	// scan (OICW page 1) cut the logo and the banner.
+	if pw > dw {
+		scale = math.Min(scale, float64(dw)/float64(pw))
+	}
+	if ph > dh {
+		scale = math.Min(scale, float64(dh)/float64(ph))
 	}
 	sw := float64(pw) * scale
 	sh := float64(ph) * scale

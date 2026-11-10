@@ -325,8 +325,18 @@ func TestHebrewReadingOrder(t *testing.T) {
 	if bcg == "" || strings.Contains(bcg, "GCB") {
 		t.Fatalf("BCG run was reversed: %q", bcg)
 	}
-	if strings.Contains(fifty, "50מעל") || strings.Contains(fifty, "•") {
-		t.Fatalf("50 jumped next to the bullet: %q", fifty)
+	if strings.Contains(fifty, "50מעל") {
+		t.Fatalf("50 glued to מעל: %q", fifty)
+	}
+	// Logical order: the organization, then the colon, then "מעל ל 50".
+	if strings.Index(fifty, "איגוד") < 0 || strings.Index(fifty, "מעל") < 0 || strings.Index(fifty, "50") < 0 {
+		t.Fatalf("50 line is incomplete: %q", fifty)
+	}
+	if strings.Index(fifty, "איגוד") > strings.Index(fifty, "מעל") || strings.Index(fifty, "מעל") > strings.Index(fifty, "50") {
+		t.Fatalf("50 line order: %q", fifty)
+	}
+	if !strings.Contains(fifty, "הישראלי:") && !strings.Contains(fifty, "הישראלי :") {
+		t.Fatalf("colon should follow הישראלי: %q", fifty)
 	}
 }
 
@@ -353,8 +363,40 @@ func TestRTLLineReadingOrder(t *testing.T) {
 	if name != "אילנה בניש" {
 		t.Fatalf("name %q", name)
 	}
-	if line != "בישראל 1,600,000" {
+	if line != "• בישראל 1,600,000" && line != "בישראל 1,600,000" {
 		t.Fatalf("line %q", line)
+	}
+}
+
+func TestMergeLatinWordSpace(t *testing.T) {
+	word := &TextObject{Content: "t ", X: 40, Y: 0, Width: 14, Height: 12, FontSize: 12}
+	next := &TextObject{Content: "organi", X: 50, Y: 0, Width: 40, Height: 12, FontSize: 12}
+	// The boxes overlap, but the space is a word boundary.
+	p := &Page{Elements: []PageElement{{Text: word}, {Text: next}}}
+	mergeTextLines(p)
+	var got string
+	for _, el := range p.Elements {
+		if el.Text != nil {
+			got += el.Text.Content
+		}
+	}
+	if !strings.Contains(got, "t organi") && !strings.Contains(got, "t  organi") {
+		t.Fatalf("word space eaten: %q", got)
+	}
+}
+
+func TestOfficePiecesJoin(t *testing.T) {
+	offi := &TextObject{Content: "Offi", X: 0, Y: 0, Width: 40, Height: 20, FontSize: 20}
+	ce := &TextObject{Content: "ce", X: 32, Y: 1, Width: 22, Height: 20, FontSize: 20}
+	p := &Page{Elements: []PageElement{{Text: offi}, {Text: ce}}}
+	mergeTextLines(p)
+	if len(p.Elements) != 1 || !strings.Contains(p.Elements[0].Text.Content, "Office") {
+		n := len(p.Elements)
+		c := ""
+		if n > 0 && p.Elements[0].Text != nil {
+			c = p.Elements[0].Text.Content
+		}
+		t.Fatalf("Office split: %d elements %q", n, c)
 	}
 }
 

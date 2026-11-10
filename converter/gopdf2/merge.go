@@ -162,6 +162,12 @@ func contiguous(g []textRef, t *TextObject) bool {
 }
 
 func latinJoin(left, right string) bool {
+	// "t " + "organi" is a word boundary. Merging it ate the PDF gap and
+	// PowerPoint drew "nonprofitorganizations". "Offi" + "ce" has no
+	// space; that overlap is the ffi ligature and stays one word.
+	if strings.HasSuffix(left, " ") || strings.HasPrefix(right, " ") {
+		return false
+	}
 	lr := []rune(strings.TrimRight(left, " "))
 	rr := []rune(strings.TrimLeft(right, " "))
 	if len(lr) == 0 || len(rr) == 0 {
@@ -311,7 +317,10 @@ func coalesce(ts []*TextObject) []TextRun {
 			// 0.15 em is under a normal word space (~0.25 em) and above the
 			// negative gaps between Canva's per-letter boxes. 0.22 em dropped
 			// "Getty images" (gap 0.21 em) and "Amadeu Pons".
-			if gap > em*0.15 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
+			// 0.06 em catches "basis" + "Operating" (a word gap the 0.15 test
+			// missed) without joining single-letter splits of one word.
+			twoWords := gap > em*0.06 && utf8.RuneCountInString(strings.TrimSpace(prev.Content)) > 2 && utf8.RuneCountInString(strings.TrimSpace(t.Content)) > 2 && !hasRTLScript(prev.Content) && !hasRTLScript(t.Content)
+			if (gap > em*0.15 || twoWords) && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
 				push(TextRun{
 					Content: " ", FontName: prev.FontName, FontSize: prev.FontSize,
 					Bold: prev.Bold, Italic: prev.Italic,
@@ -965,7 +974,11 @@ func pullBackOverlaps(p *Page) {
 		overlap := a.X + a.Width - b.X
 		// A formula's last glyph may cross the next parenthesis by a few
 		// points. Only a real collision (Andy through Morodo) is pulled back.
-		if overlap < math.Max(em*1.2, old*0.18) {
+		// A merged word that still carries its trailing space ("nonprofit ")
+		// and runs into the next word is the Canva "nonprofitorganizations"
+		// glue: stop the box at the next word.
+		wordEdge := strings.HasSuffix(a.Content, " ") || strings.HasPrefix(b.Content, " ")
+		if overlap < math.Max(em*1.2, old*0.18) && !(wordEdge && overlap > 1.2) {
 			continue
 		}
 		nw := b.X - a.X - 0.4

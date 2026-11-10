@@ -240,7 +240,8 @@
       "areaSlack": 0.02,
       "tokens": 2,
       "concatTokens": 2,
-      "sizeV140": 9042728
+      "sizeV140": 10761275,
+      "sizeNote": "v1.5.2 paints the soft-mask body text. The ceiling is this file, about 1.7 MB above the 9.0 MB picture-only deck, not a looser global cap."
     },
     "who-tb-2024": {
       "pics": 116,

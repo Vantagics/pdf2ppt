@@ -65,6 +65,27 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 		return raw, "jpeg", nil
 	}
 
+	// A 2×2 color sample with a large soft mask is a line of glyphs.
+	// The mask is the picture. "stencil" tells the page to composite
+	// neighboring lines into one PNG. Other 1-bit images stay on the
+	// path they had before, so a deck of ordinary pictures is unchanged.
+	if smask != nil && smW >= width*4 && smH >= height*4 && width <= 16 && height <= 16 {
+		sampleBPC := bpc
+		sampleRaw := raw
+		if sampleBPC > 0 && sampleBPC < 8 {
+			sampleRaw = unpackBits(raw, width, height, sampleBPC)
+			sampleBPC = 8
+		}
+		src := samplesToImage(width, height, sampleBPC, csName, ncomp, sampleRaw, decode, indexed, indexedN)
+		if src == nil {
+			src = image.NewNRGBA(image.Rect(0, 0, 1, 1))
+		}
+		painted := renderStencil(src, smask, smW, smH, smDecode, matte, opacity)
+		if len(painted) == 0 {
+			return nil, "", nil
+		}
+		return painted, "stencil", nil
+	}
 	var img image.Image
 	if isJPEG(raw) {
 		img, err = jpeg.Decode(bytes.NewReader(raw))
@@ -280,6 +301,10 @@ func softMask(xrd *model.XRefTable, d types.Dict) (samples []byte, w, h int, dec
 		return nil, 0, 0, nil, nil
 	}
 	data := sd.Content
+	bpc := intEntry(xrd, sd.Dict, "BitsPerComponent")
+	if bpc == 0 {
+		bpc = 8
+	}
 	if isJPEG(data) {
 		img, err := jpeg.Decode(bytes.NewReader(data))
 		if err != nil {
@@ -296,10 +321,43 @@ func softMask(xrd *model.XRefTable, d types.Dict) (samples []byte, w, h int, dec
 			}
 		}
 		w, h = b.Dx(), b.Dy()
+	} else if bpc < 8 && w > 0 && h > 0 {
+		samples = unpackBits(data, w, h, bpc)
 	} else {
 		samples = data
 	}
 	return samples, w, h, decodeArray(xrd, sd.Dict), matte
+}
+
+// unpackBits expands a 1, 2, or 4 bit image to one byte per pixel.
+// Rows are padded to a byte, matching PDF image samples.
+func unpackBits(data []byte, w, h, bpc int) []byte {
+	out := make([]byte, w*h)
+	if bpc < 1 || bpc > 7 {
+		return out
+	}
+	stride := (w*bpc + 7) / 8
+	maxv := 1<<bpc - 1
+	for y := 0; y < h; y++ {
+		if y*stride >= len(data) {
+			break
+		}
+		row := data[y*stride:]
+		for x := 0; x < w; x++ {
+			bit := x * bpc
+			bi := bit / 8
+			if bi >= len(row) {
+				break
+			}
+			shift := 8 - bpc - (bit % 8)
+			if shift < 0 {
+				continue
+			}
+			v := int((row[bi] >> shift) & byte(maxv))
+			out[y*w+x] = byte(v * 255 / maxv)
+		}
+	}
+	return out
 }
 
 // unmatte reverses PDF soft-mask premultiplication:

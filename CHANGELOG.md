@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.2
+
+The Hebrew "50 percent" line is one paragraph in reading order. A colon is a neutral, so it stays on הישראלי, and 50 stays a European number: `איגוד האינטרנט הישראלי: מעל ל 50 אחוז…`. The name and the 1,600,000 line are unchanged.
+
+OICW page 1 is letterboxed again. Filling the width had clipped 26 pt off the logo and the archive.org banner. A page that does not match the slide is scaled so the whole page stays inside.
+
+`canva-rotary` page 16 no longer runs "nonprofit " into "organizations". A trailing space is a word boundary, so that box stops where the next word starts. `wps-tutorial` page 4 is `WPS Office`, the same join as the Office 2019 title.
+
+`undp-gender-ar` page 10 body text is a 1-bit soft mask on a 2×2 color sample, not a font. Those masks are now pictures, and neighboring lines are one PNG per text block. The deck is 10.8 MB. Its own size ceiling is that file; the global 10% cap is unchanged. Page 10's wide pictures contain the glyph ink.
+
 ## 1.5.1
 
 Identity-V text is a vertical column. `jp-tategaki` page 1 was one 63.8×10.6 pt horizontal box, so PowerPoint drew 日本語あ and clipped いうえお. The two shows are now `bodyPr vert="eaVert"`: あいうえお at x=229, 9.7×48.4 pt, and 日本語 one column to its left. The box is taller than it is wide.

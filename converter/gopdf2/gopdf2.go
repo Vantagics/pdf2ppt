@@ -115,6 +115,9 @@ type ImageObject struct {
 	// CropL, CropT, CropR, CropB are fractions of the source bitmap removed
 	// from each edge (DrawingML a:srcRect). The placement box is the remainder.
 	CropL, CropT, CropR, CropB float64
+	// Stencil is a 1-bit soft mask painted through a tiny color sample.
+	// The glyphs are the mask. Nearby stencils are composited into one picture.
+	Stencil bool
 }
 
 // PathOp is one command of a shape outline in shape-local, y-down points.

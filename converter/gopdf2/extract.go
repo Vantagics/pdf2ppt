@@ -85,6 +85,7 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	replaceIsolatedSymbols(page)
 	coalesceGlyphShapes(page)
 	dropWhiteTextCovers(page)
+	compositeStencils(page)
 	page.syncLists()
 	return page, nil
 }

@@ -1564,6 +1564,15 @@ func (ip *interp) emitText(text string, textAdv float64) {
 	// must not be inflated: that grew "(" until it covered z₁.
 	mostlySpacing := textAdv > 0 && ip.gs.charSp*th > textAdv*0.45
 	vertical := ip.gs.font != nil && ip.gs.font.vertical
+	// One glyph whose ToUnicode is the three letters "ffi" is about one
+	// em wide. Drawing the letters makes "Offi ce".
+	if !vertical && (text == "ffi" || text == "ffl") && eff > 1 && pdfWidth > 0 && pdfWidth < eff*1.35 {
+		if text == "ffi" {
+			text = "\uFB03"
+		} else {
+			text = "\uFB04"
+		}
+	}
 	if !vertical && !mostlySpacing && pdfWidth < eff*0.4 {
 		pdfWidth = float64(utf8.RuneCountInString(text)) * eff * 0.55
 	}
@@ -2470,6 +2479,10 @@ func (ip *interp) paintImage(xo *xobject) {
 	if err != nil || len(data) == 0 {
 		return
 	}
+	stencil := format == "stencil"
+	if stencil {
+		format = "png"
+	}
 	// A page-sized translucent image is the slide background. Bake it onto
 	// the page color so PowerPoint cannot composite the PNG alpha against black.
 	// An opaque JPEG is already the background; decoding it only to write a PNG
@@ -2495,6 +2508,7 @@ func (ip *interp) paintImage(xo *xobject) {
 		Width:    w,
 		Height:   h,
 		Rotation: rot,
+		Stencil:  stencil,
 	}
 	ip.seenContent = true
 	ip.elements = append(ip.elements, PageElement{Image: img})

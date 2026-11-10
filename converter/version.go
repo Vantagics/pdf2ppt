@@ -1,4 +1,4 @@
 package converter
 
 // Version is the converter release version.
-const Version = "1.5.1"
+const Version = "1.5.2"

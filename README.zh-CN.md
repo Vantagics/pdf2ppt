@@ -41,7 +41,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.3.3
+pdf2ppt 1.3.4
 usage: pdf2ppt input.pdf output.pptx
 ```
 
@@ -102,7 +102,7 @@ go test ./converter -run 'TestRoundTrip|TestChromeSkiaSlide' -count=1 -timeout 2
 
 ## 已知限制
 
-- **一份文件只有一个幻灯片尺寸。** OOXML 只存一个 `sldSz`。演示文稿用最大的那一页做画布，后面更大的页不会被裁掉。较小的页仍用自己的框，留在这块画布的一角。
+- **一份文件只有一个幻灯片尺寸。** OOXML 只存一个 `sldSz`。这个尺寸取出现次数最多的页面；次数相同则用第一页。尺寸不同的页按原比例缩小后居中放到这张幻灯片上，不拉伸，较小的页也不放大。多出来的边是留白（letterbox）。
 - **一段 PDF 文字对应一个文本框。** 自动换行的段落，或同一行里中英混排，通常会变成同一基线上的好几个框，而不是原来的那一个文本框。字符和位置还在。
 - **表格和项目符号不是 PowerPoint 的原生对象。** 表格是单元格矩形加上文本框。项目符号是符号字符加上每行一个文本框。两者都可以继续编辑。
 - **预设形状是轮廓。** 矩形仍然是矩形。椭圆、圆角矩形、菱形和其他曲线会变成与 PDF 路径一致的自由形状。LibreOffice 栅格化的投影会保留成图片。

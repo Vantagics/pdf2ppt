@@ -46,4 +46,4 @@ No Go or git. This downloads the release binary and this skill. Set `PDF2PPT_SKI
 
 ## Limitations
 
-One slide size per file. Text is one box per PDF run, not the original frame. Tables and bullets are shapes plus text. Fonts are named, not embedded. User-password PDFs are rejected.
+One slide size per file: the most common page. A different page is scaled down and centered. Text is one box per PDF run, not the original frame. Tables and bullets are shapes plus text. Fonts are named, not embedded. User-password PDFs are rejected.

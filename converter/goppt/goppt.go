@@ -206,19 +206,25 @@ func (s *Slide) Images() []*Image {
 	return result
 }
 
-// slideSize is the largest page. OOXML stores one slide size; using the
-// maximum keeps a later, larger page from being clipped.
+// slideSize is the most common page size. A tie keeps the size that
+// appears first, which is the first page when every size is tied.
 func (p *Presentation) slideSize() (int64, int64) {
-	var w, h int64
+	if len(p.slides) == 0 {
+		return 0, 0
+	}
+	type key struct{ w, h int64 }
+	count := map[key]int{}
+	best := key{p.slides[0].Width, p.slides[0].Height}
+	bestN := 0
 	for _, s := range p.slides {
-		if s.Width > w {
-			w = s.Width
-		}
-		if s.Height > h {
-			h = s.Height
+		k := key{s.Width, s.Height}
+		count[k]++
+		if count[k] > bestN {
+			best = k
+			bestN = count[k]
 		}
 	}
-	return w, h
+	return best.w, best.h
 }
 
 // Save writes the presentation to a PPTX file at the given path.
@@ -231,6 +237,8 @@ func (p *Presentation) Save(outputPath string) error {
 	w := zip.NewWriter(f)
 
 	writeErr := func() error {
+		// One sldSz for the deck: the most common page, with other pages letterboxed.
+		p.fitSlides()
 		// Write OOXML structure
 		if err := writeContentTypes(w, p); err != nil {
 			return err

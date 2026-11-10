@@ -41,7 +41,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.3.3
+pdf2ppt 1.3.4
 usage: pdf2ppt input.pdf output.pptx
 ```
 
@@ -102,7 +102,7 @@ On the decks that were checked, PowerPoint and Keynote pages keep their pictures
 
 ## Known limitations
 
-- **One slide size per file.** OOXML stores a single `sldSz`. The presentation size is the largest page, so a later larger page is not clipped. A smaller page keeps its own box and sits in the corner of that canvas.
+- **One slide size per file.** OOXML stores a single `sldSz`. That size is the most common page size. When two sizes are equally common, the first page wins. A page of a different size is scaled down so it fits, keeping its aspect ratio, and centered. It is not stretched, and a smaller page is not enlarged. The extra margin is a letterbox.
 - **Text is one box per PDF text run.** A wrapped paragraph or a mixed Latin/Chinese line usually comes back as several boxes on the same baseline, not as the original single text frame. The characters and their positions are preserved.
 - **Tables and bullets are not native PowerPoint objects.** A table comes back as cell rectangles plus text boxes. A bullet list comes back as a bullet character and a text box per line. Both stay editable.
 - **Preset shapes are outlines.** Rectangles stay rectangles. Ovals, rounded rectangles, diamonds, and arbitrary curves become freeform geometry that matches the PDF path. Drop shadows that LibreOffice rasterizes are kept as images.

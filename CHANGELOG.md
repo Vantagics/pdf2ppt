@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.4
+
+Mixed page sizes used the largest width and the largest height as two separate numbers. The MIT Session 1 deck has 22 pages at 960×540. Its last page is a 612×792 letter box with `/Rotate 90`, which displays as 792×612. The deck became 960×612 (`sldSz` 12192000×7772400), a size no page has. The slide size is now the most common page, and a tie keeps the first page. A page that differs is scaled down to fit, aspect ratio kept, and centered. The MIT deck is 960×540 pt, `sldSz cx="12192000" cy="6858000"`.
+
 ## 1.3.3
 
 PowerPoint's repair dialog on pdf2ppt files came from markup the ECMA-376 schemas reject. The presentation omitted the required `notesSz` and the slide-master relationship. Custom geometry used `fill="evenOdd"`, which is not a legal path-fill value. Zip entries were stamped 1980-00-00, an invalid DOS date. A text outline was written after the run fill; the schema requires `a:ln` first.

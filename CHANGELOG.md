@@ -8,7 +8,7 @@ A box stays at its PDF x. The next box stays at its own PDF x. A Latin word that
 
 The v1.5.4 text is kept: he-openu unique recall is 1, undp captions keep their trailing spaces and the recall baseline is 1, and he-openu page 2 is still the spaced pair with 60 on the left and the 50 and BCG lines in order.
 
-`TestRenderedSlidesMatchBaseline` now includes kaist-xai page 18, canva-rotary pages 1, 8, and 16, and he-openu page 13. Those four new pages, and canva-rotary page 1, fail when the mean pixel error rises above 16.
+`TestRenderedSlidesMatchBaseline` now includes kaist-xai page 18, canva-rotary pages 1, 8, and 16, and he-openu page 13. canva-rotary pages 1, 8, and 16 and he-openu page 13 fail above a mean error of 16. kaist-xai page 18 fails above 28, because LibreOffice 26.2 already differs from the stored 24.2 render by about 23.
 
 ## 1.5.4
 

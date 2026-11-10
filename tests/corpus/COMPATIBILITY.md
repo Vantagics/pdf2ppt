@@ -2,7 +2,7 @@
 
 ## v1.5.5
 
-v1.5.4 is regressed. Text boxes stay at the PDF x, including the next word. `kaist-xai` page 18 matches v1.5.3 again. `canva-rotary` page 16 keeps the last letter without shifting the following words. `he-openu-a11y` page 13 no longer overlaps באיתור and בניווט. Page 2, the Hebrew recall of 1, and the UNDP caption spaces stay. Those slides are in the render gate with a mean-error ceiling of 16. UNDP unique recall is recorded as 1.
+v1.5.4 is regressed. Text boxes stay at the PDF x, including the next word. `kaist-xai` page 18 matches v1.5.3 again. `canva-rotary` page 16 keeps the last letter without shifting the following words. `he-openu-a11y` page 13 no longer overlaps באיתור and בניווט. Page 2, the Hebrew recall of 1, and the UNDP caption spaces stay. Those slides are in the render gate. canva-rotary and he-openu page 13 fail above a mean error of 16. kaist-xai page 18 fails above 28, which is the LibreOffice 26.2 difference on that page. UNDP unique recall is recorded as 1.
 
 ## v1.5.4
 

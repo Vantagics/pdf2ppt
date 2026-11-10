@@ -533,7 +533,7 @@
       "name": "kaist-xai-p18",
       "id": "kaist-xai",
       "page": 18,
-      "maxAbsErr": 16
+      "maxAbsErr": 28
     },
     {
       "name": "canva-rotary-p8",

@@ -1537,9 +1537,27 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		bx += px
 		by += py
 	}
-	pdfWidth := ip.pageLen(textAdv)
-	if pdfWidth < eff*0.4 {
-		pdfWidth = float64(len([]rune(text))) * eff * 0.55
+	// Tc is added after every glyph, including the last. That last spacing
+	// places the next show; it is not ink. Counting it made the KUST "("
+	// an 81 pt box, and fitRun grew the glyph to fill it.
+	th := ip.gs.hScale / 100
+	if th == 0 {
+		th = 1
+	}
+	inkAdv := textAdv
+	if ip.gs.charSp != 0 && utf8.RuneCountInString(text) > 0 {
+		inkAdv -= ip.gs.charSp * th
+		if inkAdv < 0.4 {
+			inkAdv = 0.4
+		}
+	}
+	pdfWidth := ip.pageLen(inkAdv)
+	// A font that reports no widths yields a tiny advance. A narrow glyph
+	// whose advance is mostly Tc (the KUST parenthesis) is real ink and
+	// must not be inflated: that grew "(" until it covered z₁.
+	mostlySpacing := textAdv > 0 && ip.gs.charSp*th > textAdv*0.45
+	if !mostlySpacing && pdfWidth < eff*0.4 {
+		pdfWidth = float64(utf8.RuneCountInString(text)) * eff * 0.55
 	}
 	// Fit the fallback font to the PDF advance before the box is padded,
 	// so a wider substitute cannot paint into the next run.

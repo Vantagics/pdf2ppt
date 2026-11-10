@@ -190,6 +190,159 @@ func TestSubscriptJoinsBelowALetter(t *testing.T) {
 	}
 }
 
+func TestLetterUnderAWordIsNotASubscript(t *testing.T) {
+	// Canva sets a smaller letter just under a big one. That letter is part
+	// of the word, not a formula subscript.
+	big := &TextObject{Content: "W", FontName: "Noto Sans", FontSize: 134, X: 334, Y: 32, Width: 90, Height: 160}
+	small := &TextObject{Content: "a", FontName: "Noto Sans", FontSize: 36, X: 430, Y: 90, Width: 28, Height: 40}
+	p := &Page{Elements: []PageElement{{Text: big}, {Text: small}}}
+	attachSubscripts(p)
+	if len(p.Elements) != 2 {
+		t.Fatalf("letter folded into the word: %d elements, content %q", len(p.Elements), big.Content)
+	}
+	if big.Content != "W" || small.Content != "a" {
+		t.Fatalf("content %q %q", big.Content, small.Content)
+	}
+}
+
+func TestKUSTOpeningParenMatchesZ(t *testing.T) {
+	pdf := corpusFile("kust-pressure")
+	if pdf == "" {
+		pdf = corpusFile("kust")
+	}
+	if pdf == "" {
+		t.Skip("kust pdf not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := doc.GetPage(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paren, zee float64
+	found := false
+	for _, tb := range p.TextObjects {
+		if !strings.Contains(tb.Content, "(") || !strings.Contains(tb.Content, "z") {
+			continue
+		}
+		for _, r := range tb.Runs {
+			trim := strings.TrimSpace(r.Content)
+			if strings.HasPrefix(trim, "(") {
+				paren = r.FontSize
+				found = true
+			}
+			if trim == "z" {
+				zee = r.FontSize
+			}
+		}
+	}
+	if !found || zee == 0 {
+		t.Fatal("formula parenthesis was not found")
+	}
+	// Tc used to make this glyph 32 pt against a 29.8 pt z.
+	if paren > zee+0.6 {
+		t.Fatalf("opening paren is %.1f pt, z is %.1f pt", paren, zee)
+	}
+}
+
+func TestCanvaRotaryTitlesKeepReadingOrder(t *testing.T) {
+	pdf := corpusFile("canva-rotary")
+	if pdf == "" {
+		pdf = corpusFile("canva")
+	}
+	if pdf == "" {
+		t.Skip("canva rotary pdf not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		page int
+		want string
+	}{
+		{1, "What"},
+		{1, "Canva"},
+		{6, "Creating"},
+		{6, "Designs"},
+		{7, "Social"},
+	}
+	for _, c := range cases {
+		p, err := doc.GetPage(c.page)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tb := range p.TextObjects {
+			if tb.Y > 200 {
+				continue
+			}
+			for _, r := range tb.Runs {
+				if r.Baseline < -20000 && strings.TrimSpace(r.Content) != "" {
+					t.Fatalf("page %d title letter %q was taken as a subscript", c.page+1, r.Content)
+				}
+			}
+		}
+		// Title boxes are placed left to right. Reading order is that order.
+		type item struct {
+			x float64
+			s string
+		}
+		var items []item
+		for _, tb := range p.TextObjects {
+			if tb.Y > 200 {
+				continue
+			}
+			items = append(items, item{tb.X, tb.Content})
+		}
+		for i := 1; i < len(items); i++ {
+			for j := i; j > 0 && items[j].x < items[j-1].x; j-- {
+				items[j], items[j-1] = items[j-1], items[j]
+			}
+		}
+		var b strings.Builder
+		for _, it := range items {
+			b.WriteString(it.s)
+		}
+		if !strings.Contains(b.String(), c.want) {
+			t.Fatalf("page %d title %q, missing %q", c.page+1, b.String(), c.want)
+		}
+	}
+}
+
+func TestMahidolKeepsAI(t *testing.T) {
+	pdf := corpusFile("canva-mahidol-adv")
+	if pdf == "" {
+		pdf = corpusFile("canva-mahidol")
+	}
+	if pdf == "" {
+		t.Skip("canva mahidol pdf not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Slide 24 is the style list whose last chip is GenAI. "AI" has to stay
+	// its own run. The v1.4.2 unique-token extra was the doubled "aaii"
+	// from writing each letter twice; the letters themselves are these runs.
+	n := 0
+	for i := 0; i < doc.PageCount(); i++ {
+		p, err := doc.GetPage(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tb := range p.TextObjects {
+			if strings.TrimSpace(tb.Content) == "AI" || strings.Contains(tb.Content, "AI") {
+				n++
+			}
+		}
+	}
+	if n < 2 {
+		t.Fatalf("AI runs %d, the GenAI chip was dropped", n)
+	}
+}
+
 func TestPsumacLockIsOutline(t *testing.T) {
 	pdf := corpusFile("psumac")
 	if pdf == "" {

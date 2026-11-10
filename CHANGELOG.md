@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.7
+
+The KUST opening parenthesis was 32 pt because PowerPoint's character spacing (`Tc` ≈ 30) was counted as the glyph's width. `fitRun` then grew "(" to fill an 81 pt box, and that box covered `z₁`. The spacing after the last glyph is no longer ink, so "(" stays the same size as `z` on page 4. The formula is still `p₂ = p₁ + ρg(z₁ − z₂)`.
+
+Canva Rotary titles were scrambled because a smaller letter sitting under a big one was taken as a subscript and pulled out of reading order. Only a digit is a subscript now. Page 2 reads `What is Canva?`, page 7 reads `Creating Designs`, and page 8 reads `Canva for Social`. canva-mahidol page 1 is unchanged.
+
+canva-mahidol's 153rd concatenated token in v1.4.2 was `aaii`, from writing each letter of the style list twice (`  AAII`). The letters `AI` are still their own runs (the source line is `Gen AI`). Putting the duplicate letters back in that order would turn `Sustainability` into `SSuusstt…`, so that artifact is not restored. The unique-token count stays 152, inside the 1.5% floor.
+
 ## 1.4.6
 
 The picture, size, token, and LibreOffice render gates run in GitHub Actions. The workflow downloads the manifest into `PDF2PPT_CORPUS` (cached on the manifest hash, four retries) and the tests read that directory. A missing required PDF fails the job. Three URLs are warnings: `tsmc-2q25-zh` (Cloudflare 403), `korea-privacy` (the attachment link returns an expired-download page), and `nrcs-cattle-distiller` (`www.nrcs.usda.gov` accepts TLS and then sends no bytes). The other 33 decks, including mit-ocw-ses1 and mit-datamgmt, have stored picture counts, v1.4.0 sizes, token counts, and a rendered page. Token counts may sit 1.5% (at least 2 tokens) under the baseline, which is the gap system font metrics open between machines. A rendered page may differ by 24 levels from the stored PNG, which is the gap between LibreOffice 24.2 and 26.2; a filled hole is about 90. The release job publishes binaries only after the OOXML run on that commit is green.

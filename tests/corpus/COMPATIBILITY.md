@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.4.7
+
+The KUST "(" on page 4 is the same size as `z`. Canva Rotary titles on pages 2, 7, and 8 keep reading order; a smaller letter is not a subscript. canva-mahidol still has `AI` as its own runs. The v1.4.2 token `aaii` was the doubled form of that `AI`.
+
 ## v1.4.6
 
 GitHub Actions fetches the corpus and runs `TestPictureCountBaseline` and `TestRenderedSlidesMatchBaseline` with `-v`. `PDF2PPT_CORPUS` is the directory. Fewer than the required decks fails the job. `tsmc-2q25-zh` (Cloudflare 403), `korea-privacy` (expired attachment link), and `nrcs-cattle-distiller` (USDA host sends no bytes after TLS) are warnings. The other 33 decks, including both MIT decks, are gated on picture count, v1.4.0 size, tokens, and a LibreOffice render. A release tag waits for that OOXML run to be green.

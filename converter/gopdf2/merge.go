@@ -397,8 +397,19 @@ func attachSubscripts(p *Page) {
 }
 
 func subscriptCandidate(t *TextObject) bool {
-	n := utf8.RuneCountInString(strings.TrimSpace(t.Content))
-	return n >= 1 && n <= 2
+	// Only a digit. Canva paints a smaller letter just below a big one
+	// (the title "What", "Social"); treating that letter as a subscript
+	// pulled it out of reading order. A formula digit is the real case.
+	s := strings.TrimSpace(t.Content)
+	if s == "" || utf8.RuneCountInString(s) > 2 {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func subscriptHost(body, sub *TextObject) bool {

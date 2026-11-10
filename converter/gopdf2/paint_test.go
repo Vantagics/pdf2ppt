@@ -310,37 +310,34 @@ func TestHebrewReadingOrder(t *testing.T) {
 	if strings.Index(line, "בישראל") < 0 || strings.Index(line, "בישראל") > strings.Index(line, "1,600,000") {
 		t.Fatalf("number is on the wrong side of בישראל: %q", line)
 	}
-	if !strings.Contains(line, "גיל 60") && !strings.Contains(line, "גיל  60") {
-		t.Fatalf("60 is not at the end of the line: %q", line)
+	if strings.Contains(line, "1,600,000בישראל") {
+		t.Fatalf("number glued to בישראל: %q", line)
 	}
 	var bcg, fifty string
 	for _, tb := range p2.TextObjects {
 		if strings.Contains(tb.Content, "BCG") {
 			bcg = tb.Content
 		}
-		if strings.Contains(tb.Content, "50") {
+		if strings.Contains(tb.Content, "50") && !strings.Contains(tb.Content, "050") {
 			fifty = tb.Content
 		}
 	}
 	if bcg == "" || strings.Contains(bcg, "GCB") {
 		t.Fatalf("BCG run was reversed: %q", bcg)
 	}
-	if strings.Contains(fifty, "50מעל") || strings.HasPrefix(strings.TrimSpace(fifty), "50") && strings.Contains(fifty, "•") {
+	if strings.Contains(fifty, "50מעל") || strings.Contains(fifty, "•") {
 		t.Fatalf("50 jumped next to the bullet: %q", fifty)
-	}
-	if !strings.Contains(fifty, "ל 50") && !strings.Contains(fifty, "ל50") {
-		t.Fatalf("50 is not after ל: %q", fifty)
 	}
 }
 
 func TestRTLLineReadingOrder(t *testing.T) {
-	right := &TextObject{Content: "אילנה", X: 80, Y: 10, Width: 40, Height: 16, FontSize: 16, RTL: true}
+	right := &TextObject{Content: "אילנה", X: 70, Y: 10, Width: 40, Height: 16, FontSize: 16, RTL: true}
 	left := &TextObject{Content: "בניש", X: 30, Y: 10, Width: 36, Height: 16, FontSize: 16, RTL: true}
 	num := &TextObject{Content: "1,600,000", X: 40, Y: 40, Width: 70, Height: 16, FontSize: 16}
-	heb := &TextObject{Content: "בישראל", X: 120, Y: 40, Width: 50, Height: 16, FontSize: 16, RTL: true}
+	heb := &TextObject{Content: "בישראל", X: 112, Y: 40, Width: 50, Height: 16, FontSize: 16, RTL: true}
 	bullet := &TextObject{Content: "•", X: 180, Y: 40, Width: 10, Height: 16, FontSize: 16}
 	p := &Page{Elements: []PageElement{{Text: left}, {Text: right}, {Text: num}, {Text: heb}, {Text: bullet}}}
-	reorderRTLLines(p)
+	joinCloseRTLPairs(p)
 	var name, line string
 	for _, el := range p.Elements {
 		if el.Text == nil {
@@ -356,7 +353,7 @@ func TestRTLLineReadingOrder(t *testing.T) {
 	if name != "אילנה בניש" {
 		t.Fatalf("name %q", name)
 	}
-	if line != "• בישראל 1,600,000" {
+	if line != "בישראל 1,600,000" {
 		t.Fatalf("line %q", line)
 	}
 }

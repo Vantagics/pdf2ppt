@@ -62,16 +62,17 @@ func hasRTLScript(s string) bool {
 	return false
 }
 
-// reorderRTLLines builds one logical-order box for a mixed RTL line.
-// Each fragment is already logical (digits and Latin keep their order).
-// Joining those fragments left to right put "1,600,000" on the right of
-// בישראל and glued "בניש" to "אילנה" with no space. Reading order is the
-// right-hand fragment first, and a gap between fragments is a word space.
-func reorderRTLLines(p *Page) {
+// joinCloseRTLPairs joins two neighboring runs whose boxes almost touch.
+// Merge walks left to right, so "בניש" (left) was glued in front of
+// "אילנה" (right) and "1,600,000" landed in front of בישראל. The right-hand
+// run is the one that comes first in reading order. A wide overlap is a
+// whole line whose own spaces already match the v1.5.0 text, and joining
+// it dropped those words.
+func joinCloseRTLPairs(p *Page) {
 	var refs []textRef
 	for i := range p.Elements {
 		t := p.Elements[i].Text
-		if t == nil || t.Vertical || !horizontal(t.Rotation) {
+		if t == nil || t.Vertical || !horizontal(t.Rotation) || strings.TrimSpace(t.Content) == "" {
 			continue
 		}
 		refs = append(refs, textRef{i, t})
@@ -80,54 +81,34 @@ func reorderRTLLines(p *Page) {
 		return
 	}
 	sortRefs(refs)
-	var lines [][]textRef
-	for _, r := range refs {
-		if len(lines) == 0 || !sameLine(lines[len(lines)-1][0].t, r.t) {
-			lines = append(lines, []textRef{r})
-			continue
-		}
-		lines[len(lines)-1] = append(lines[len(lines)-1], r)
-	}
 	remove := map[int]bool{}
-	for _, line := range lines {
-		if !lineHasRTL(line) {
-			continue
+	for i := 0; i < len(refs); {
+		j := i + 1
+		for j < len(refs) && sameLine(refs[i].t, refs[j].t) {
+			j++
 		}
-		var groups [][]textRef
-		for _, r := range line {
-			if len(groups) == 0 {
-				groups = append(groups, []textRef{r})
+		line := refs[i:j]
+		i = j
+		for k := 0; k+1 < len(line); k++ {
+			a, b := line[k].t, line[k+1].t
+			if remove[line[k].i] || remove[line[k+1].i] {
 				continue
 			}
-			prev := groups[len(groups)-1]
-			last := prev[len(prev)-1].t
-			gap := r.t.X - (last.X + last.Width)
-			em := math.Max(last.FontSize, r.t.FontSize)
-			if em < 1 {
-				em = 12
-			}
-			if gap > em*1.6 {
-				groups = append(groups, []textRef{r})
+			if !closeRTLPair(a, b) {
 				continue
 			}
-			groups[len(groups)-1] = append(prev, r)
-		}
-		for _, g := range groups {
-			if len(g) < 2 {
-				continue
-			}
-			p.Elements[g[0].i].Text = joinRTLReadingOrder(g)
-			for _, r := range g[1:] {
-				remove[r.i] = true
-			}
+			// b is to the right of a.
+			p.Elements[line[k].i].Text = joinRTLPair(b, a)
+			remove[line[k+1].i] = true
+			line[k].t = p.Elements[line[k].i].Text
 		}
 	}
 	if len(remove) == 0 {
 		return
 	}
 	kept := p.Elements[:0]
-	for i, el := range p.Elements {
-		if remove[i] {
+	for idx, el := range p.Elements {
+		if remove[idx] {
 			continue
 		}
 		kept = append(kept, el)
@@ -135,107 +116,42 @@ func reorderRTLLines(p *Page) {
 	p.Elements = kept
 }
 
-func lineHasRTL(line []textRef) bool {
-	for _, r := range line {
-		if r.t.RTL || hasRTLScript(r.t.Content) {
-			return true
-		}
+func closeRTLPair(left, right *TextObject) bool {
+	if !hasRTLScript(left.Content) && !hasRTLScript(right.Content) {
+		return false
 	}
-	return false
+	if utf8.RuneCountInString(strings.TrimSpace(left.Content)) < 2 || utf8.RuneCountInString(strings.TrimSpace(right.Content)) < 2 {
+		return false
+	}
+	gap := right.X - (left.X + left.Width)
+	em := math.Max(left.FontSize, right.FontSize)
+	if em < 1 {
+		em = 12
+	}
+	return gap > -0.3*em && gap < 0.55*em
 }
 
-func joinRTLReadingOrder(g []textRef) *TextObject {
-	items := make([]*TextObject, len(g))
-	for i := range g {
-		items[i] = g[i].t
-	}
-	best := items[0]
-	for _, t := range items[1:] {
-		if utf8.RuneCountInString(strings.TrimSpace(t.Content)) > utf8.RuneCountInString(strings.TrimSpace(best.Content)) {
-			best = t
-		}
-	}
-	var b strings.Builder
-	var runs []TextRun
-	var prev *TextObject
-	push := func(content string, src *TextObject) {
-		if content == "" {
-			return
-		}
-		run := TextRun{
-			Content: content, FontName: src.FontName, FontSize: src.FontSize,
-			Bold: src.Bold, Italic: src.Italic,
-			ColorR: src.ColorR, ColorG: src.ColorG, ColorB: src.ColorB,
-		}
-		if n := len(runs); n > 0 && sameStyle(runs[n-1], run) {
-			runs[n-1].Content += content
-			return
-		}
-		runs = append(runs, run)
-	}
-	for i := len(items) - 1; i >= 0; i-- {
-		t := items[i]
-		piece := strings.TrimSpace(t.Content)
-		if piece == "" {
-			continue
-		}
-		if prev != nil {
-			gap := prev.X - (t.X + t.Width)
-			em := math.Max(prev.FontSize, t.FontSize)
-			if em < 1 {
-				em = 12
-			}
-			if rtlWordGap(gap, em, strings.TrimSpace(prev.Content), piece) {
-				b.WriteString(" ")
-				push(" ", prev)
-			}
-		}
-		b.WriteString(piece)
-		push(piece, t)
-		prev = t
-	}
-	out := *best
-	out.Content = b.String()
+func joinRTLPair(right, left *TextObject) *TextObject {
+	out := *right
+	rs := strings.TrimSpace(right.Content)
+	ls := strings.TrimSpace(left.Content)
+	out.Content = rs + " " + ls
 	out.RTL = true
-	out.Runs = runs
-	out.holdX = false
-	minX := items[0].X
-	maxR := items[0].X + items[0].Width
-	minY := items[0].Y
-	maxB := items[0].Y + items[0].Height
-	for _, t := range items[1:] {
-		if t.X < minX {
-			minX = t.X
-		}
-		if t.X+t.Width > maxR {
-			maxR = t.X + t.Width
-		}
-		if t.Y < minY {
-			minY = t.Y
-		}
-		if t.Y+t.Height > maxB {
-			maxB = t.Y + t.Height
-		}
+	out.Runs = nil
+	out.holdX = true
+	if left.X < out.X {
+		out.X = left.X
 	}
-	out.X = minX
-	out.Y = minY
-	out.Width = maxR - minX
-	out.Height = maxB - minY
-	if out.Width < 1 {
-		out.Width = 1
+	r := right.X + right.Width
+	if left.X+left.Width > r {
+		r = left.X + left.Width
+	}
+	out.Width = r - out.X
+	if left.Y < out.Y {
+		out.Y = left.Y
+	}
+	if left.Y+left.Height > out.Y+out.Height {
+		out.Height = left.Y + left.Height - out.Y
 	}
 	return &out
-}
-
-func rtlWordGap(gap, em float64, right, left string) bool {
-	if gap > em*0.15 {
-		return true
-	}
-	// Box padding eats the word space, so the two name boxes overlap by a
-	// point or two and the gap is negative. A one-letter fragment is
-	// kerning, not a word boundary. A deep overlap is one word painted twice.
-	if utf8.RuneCountInString(right) > 1 && utf8.RuneCountInString(left) > 1 && gap > -0.35*em {
-		return true
-	}
-	return false
 }

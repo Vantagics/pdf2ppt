@@ -40,6 +40,7 @@ func TestChromeSkiaSlide(t *testing.T) {
 	if _, err := NewConverter(nil).Convert(pdf, pptx); err != nil {
 		t.Fatal(err)
 	}
+	validateOOXML(t, pptx)
 	rtDir := filepath.Join(work, "rt")
 	if err := os.MkdirAll(rtDir, 0o755); err != nil {
 		t.Fatal(err)

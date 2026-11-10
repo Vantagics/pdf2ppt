@@ -64,6 +64,7 @@ func TestRoundTrip(t *testing.T) {
 			t.Fatalf("%s: no pages", base)
 		}
 		produced = append(produced, out)
+		validateOOXML(t, out)
 	}
 
 	if err := runSoffice(t, filepath.Join(work, "lo2"), rtPDF, produced); err != nil {

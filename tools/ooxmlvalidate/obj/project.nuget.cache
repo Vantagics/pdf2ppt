@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "cpApvAS4OBNmu1P/86MoCdlTGAdNZvXFZ8SNFhfWidGtAeFiJ7eKn7ofFW7z09eIUeYAvwq4k8/7Rd7BJoP0LA==",
+  "success": true,
+  "projectFilePath": "/workspace/tools/ooxmlvalidate/ooxmlvalidate.csproj",
+  "expectedPackageFiles": [
+    "/tmp/agent-readme/.nuget/packages/documentformat.openxml/3.2.0/documentformat.openxml.3.2.0.nupkg.sha512",
+    "/tmp/agent-readme/.nuget/packages/documentformat.openxml.framework/3.2.0/documentformat.openxml.framework.3.2.0.nupkg.sha512",
+    "/tmp/agent-readme/.nuget/packages/system.io.packaging/8.0.1/system.io.packaging.8.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}

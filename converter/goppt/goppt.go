@@ -244,6 +244,9 @@ func (p *Presentation) Save(outputPath string) error {
 		if err := writePresentationRels(w, p); err != nil {
 			return err
 		}
+		if err := writePackageParts(w, p); err != nil {
+			return err
+		}
 		for i, slide := range p.slides {
 			if err := writeSlideXML(w, slide, i+1); err != nil {
 				return err

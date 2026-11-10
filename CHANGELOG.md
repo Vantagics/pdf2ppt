@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.3
+
+PowerPoint's repair dialog on pdf2ppt files came from markup the ECMA-376 schemas reject. The presentation omitted the required `notesSz` and the slide-master relationship. Custom geometry used `fill="evenOdd"`, which is not a legal path-fill value. Zip entries were stamped 1980-00-00, an invalid DOS date. A text outline was written after the run fill; the schema requires `a:ln` first.
+
+The package now includes a blank slide master, layout, theme, and document properties. `tools/ooxmlvalidate` runs the Open XML SDK validator. `TestOOXMLKitchenSink` fails if a generated file is not valid.
+
 ## 1.3.2
 
 Skill install is one command. Linux and macOS: `curl -fsSL .../install.sh | sh`. Windows: `iex (irm .../install.ps1)`. The skill lands in whichever of `~/.cursor/skills`, `~/.claude/skills`, and `~/.codex/skills` already exist, or in `~/.cursor/skills` if none do. `PDF2PPT_SKILL_DIR` overrides that. `convert.sh` is gone; the command is `pdf2ppt input.pdf output.pptx`.

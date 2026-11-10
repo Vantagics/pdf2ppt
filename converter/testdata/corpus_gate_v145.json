@@ -1,6 +1,6 @@
 {
   "source": "v1.4.5",
-  "note": "Picture count, picture area, unique Latin tokens, concatenated a:t tokens, and v1.4.0 PPTX bytes for every manifest deck except the known-blocked TSMC file. Renders are LibreOffice page images. A later build fails if pictures or tokens drop more than 0.3%, area drops more than the slack, the PPTX exceeds 110% of the v1.4.0 size, or a rendered page drifts.",
+  "note": "Picture count, picture area, unique Latin tokens, concatenated a:t tokens, and v1.4.0 PPTX bytes for every manifest deck whose URL still returns a PDF. tsmc-2q25-zh, korea-privacy, and nrcs-cattle-distiller are known-blocked and omitted. Renders are LibreOffice page images.",
   "decks": {
     "aist-ohno": {
       "pics": 51,
@@ -177,14 +177,6 @@
       "tokens": 141,
       "concatTokens": 159,
       "sizeV140": 787071
-    },
-    "nrcs-cattle-distiller": {
-      "pics": 48,
-      "area": 70358537982422,
-      "areaSlack": 0.02,
-      "tokens": 556,
-      "concatTokens": 604,
-      "sizeV140": 1043217
     },
     "psumac-keynote": {
       "pics": 140,
@@ -384,11 +376,6 @@
     {
       "name": "nhsa-ypsw-p1",
       "id": "nhsa-ypsw",
-      "page": 1
-    },
-    {
-      "name": "nrcs-cattle-distiller-p1",
-      "id": "nrcs-cattle-distiller",
       "page": 1
     },
     {

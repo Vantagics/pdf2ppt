@@ -2,7 +2,7 @@
 
 ## 1.4.6
 
-The picture, size, token, and LibreOffice render gates run in GitHub Actions. The workflow downloads the manifest into `PDF2PPT_CORPUS` (cached on the manifest hash, four retries) and the tests read that directory. A missing required PDF fails the job. `tsmc-2q25-zh` is still a warning: Cloudflare returns 403. `korea-privacy` is a warning too: the attachment link now returns the portal's expired-download page instead of a PDF. The other 34 decks, including mit-ocw-ses1 and mit-datamgmt, have stored picture counts, v1.4.0 sizes, token counts, and a rendered page. The release job publishes binaries only after the OOXML run on that commit is green.
+The picture, size, token, and LibreOffice render gates run in GitHub Actions. The workflow downloads the manifest into `PDF2PPT_CORPUS` (cached on the manifest hash, four retries) and the tests read that directory. A missing required PDF fails the job. Three URLs are warnings: `tsmc-2q25-zh` (Cloudflare 403), `korea-privacy` (the attachment link returns an expired-download page), and `nrcs-cattle-distiller` (`www.nrcs.usda.gov` accepts TLS and then sends no bytes). The other 33 decks, including mit-ocw-ses1 and mit-datamgmt, have stored picture counts, v1.4.0 sizes, token counts, and a rendered page. The release job publishes binaries only after the OOXML run on that commit is green.
 
 ## 1.4.5
 

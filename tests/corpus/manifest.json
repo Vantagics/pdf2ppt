@@ -41,6 +41,7 @@
       "id": "nrcs-cattle-distiller",
       "producer": "Acrobat Distiller 24.0 (Windows); title names Microsoft PowerPoint",
       "kind": "letter-size print of a PowerPoint deck, not a 16:9 export",
+      "blocked": "www.nrcs.usda.gov accepts TLS and then sends no bytes",
       "url": "https://www.nrcs.usda.gov/sites/default/files/2025-01/250113-NV-NRCS-2025-UNR-Cattlemens-Update.pdf",
       "pages": 22,
       "license": "USDA NRCS public website. Not committed.",

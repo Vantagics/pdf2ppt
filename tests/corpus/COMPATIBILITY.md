@@ -2,7 +2,7 @@
 
 ## v1.4.6
 
-GitHub Actions fetches the corpus and runs `TestPictureCountBaseline` and `TestRenderedSlidesMatchBaseline` with `-v`. `PDF2PPT_CORPUS` is the directory. Fewer than the required decks fails the job. `tsmc-2q25-zh` (Cloudflare 403) and `korea-privacy` (expired attachment link) are warnings. The other 34 decks, including both MIT decks, are gated on picture count, v1.4.0 size, tokens, and a LibreOffice render. A release tag waits for that OOXML run to be green.
+GitHub Actions fetches the corpus and runs `TestPictureCountBaseline` and `TestRenderedSlidesMatchBaseline` with `-v`. `PDF2PPT_CORPUS` is the directory. Fewer than the required decks fails the job. `tsmc-2q25-zh` (Cloudflare 403), `korea-privacy` (expired attachment link), and `nrcs-cattle-distiller` (USDA host sends no bytes after TLS) are warnings. The other 33 decks, including both MIT decks, are gated on picture count, v1.4.0 size, tokens, and a LibreOffice render. A release tag waits for that OOXML run to be green.
 
 ## v1.4.5
 

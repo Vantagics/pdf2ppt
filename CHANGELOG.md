@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+Skill install is one command. Linux and macOS: `curl -fsSL .../install.sh | sh`. Windows: `iex (irm .../install.ps1)`. The skill lands in whichever of `~/.cursor/skills`, `~/.claude/skills`, and `~/.codex/skills` already exist, or in `~/.cursor/skills` if none do. `PDF2PPT_SKILL_DIR` overrides that. `convert.sh` is gone; the command is `pdf2ppt input.pdf output.pptx`.
+
 ## 1.3.1
 
 The skill install no longer needs Go or git. `install.sh` / `install.ps1` download the release binary, check `SHA256SUMS`, and put it in `~/.local/bin` or `%LOCALAPPDATA%\pdf2ppt`. The same command downloads the skill folder. README.md and README.zh-CN.md start with a block an agent can paste. Releases also attach `pdf2ppt-skill.tar.gz` and `pdf2ppt-skill.zip`.

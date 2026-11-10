@@ -6,67 +6,28 @@
 
 ## 给智能体的安装步骤
 
-下面这一段就是全部安装过程。不需要 git，不需要 Go，也不需要先克隆仓库。按机器选一块，整段复制执行，不要改里面的网址。
-
-怎么选：`uname -s` 打印 `Linux` 或 `Darwin` 时用 Linux/macOS 这一段。PowerShell 里 `$env:OS` 等于 `Windows_NT` 时用 Windows 这一段。
-
-### Linux 和 macOS（Cursor）
+Linux 或 macOS（`uname -s` 是 `Linux` 或 `Darwin`）：
 
 ```bash
-#!/bin/sh
-set -eu
-if ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y curl ca-certificates tar
-  elif command -v apk >/dev/null 2>&1; then
-    apk add --no-cache curl ca-certificates tar
-  else
-    echo "Install curl and tar, then run this script again." >&2
-    exit 1
-  fi
-fi
-curl -fsSL https://raw.githubusercontent.com/Vantagics/pdf2ppt/main/skill/pdf2ppt/scripts/install.sh | sh -s -- --skill-dir "$HOME/.cursor/skills"
-test -f "$HOME/.cursor/skills/pdf2ppt/SKILL.md"
-test -x "$HOME/.local/bin/pdf2ppt"
-"$HOME/.local/bin/pdf2ppt" -v
-"$HOME/.local/bin/pdf2ppt" "$HOME/.cursor/skills/pdf2ppt/examples/sample.pdf" "$HOME/sample.pptx"
-magic=$(od -An -N 2 -t x1 "$HOME/sample.pptx" | tr -d ' \n')
-test "$magic" = "504b"
-echo PPTX_OK
+curl -fsSL https://raw.githubusercontent.com/Vantagics/pdf2ppt/main/skill/pdf2ppt/scripts/install.sh | sh
 ```
 
-`apt-get` 和 `apk` 需要 root（容器里通常就是 root）。如果 curl 和 tar 已经有了，这一步会跳过。安装程序从最新的 GitHub Release 下载对应系统的二进制，用 `SHA256SUMS` 核对，再写到 `$HOME/.local/bin/pdf2ppt`，同时下载技能文件夹。不必把这个目录加进 `PATH`，直接运行 `"$HOME/.local/bin/pdf2ppt"`。
-
-成功时：脚本会打印 `PDF2PPT_BIN=` 和 `SKILL_MD=`，`pdf2ppt -v` 打出版本号，最后一行是 `PPTX_OK`。
-
-失败时：校验和不对会在安装二进制之前停下来（不用手工删文件，把这一段再跑一遍）。404 表示这个操作系统或 CPU 不在发布文件里，脚本会打印资源名（`pdf2ppt_linux_amd64`、`pdf2ppt_linux_arm64`、`pdf2ppt_darwin_amd64` 或 `pdf2ppt_darwin_arm64`）。`SKILL.md missing` 表示技能包没下下来，再跑一遍这一段。
-
-Claude Code 用同一段，只改一处：`--skill-dir "$HOME/.claude/skills"`，并且 `test -f` 的路径改成 `$HOME/.claude/skills/pdf2ppt/SKILL.md`。Codex 用 `--skill-dir "$HOME/.codex/skills"`。其他读取 SKILL.md 的智能体：把 `--skill-dir` 设成那个应该出现 `pdf2ppt` 文件夹的目录。只给当前项目用时，写成 `--skill-dir "$PWD/.cursor/skills"` 或 `--skill-dir "$PWD/.claude/skills"`。
-
-### Windows（Cursor）
+Windows PowerShell（`$env:OS` 是 `Windows_NT`）：
 
 ```powershell
-$ErrorActionPreference = "Stop"
-$dst = Join-Path $env:TEMP "pdf2ppt-install.ps1"
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Vantagics/pdf2ppt/main/skill/pdf2ppt/scripts/install.ps1" -OutFile $dst
-powershell -ExecutionPolicy Bypass -File $dst -SkillDir "$env:USERPROFILE\.cursor\skills"
-if (-not (Test-Path "$env:USERPROFILE\.cursor\skills\pdf2ppt\SKILL.md")) { throw "SKILL.md missing" }
-$bin = "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe"
-& $bin -v
-if ($LASTEXITCODE -ne 0) { throw "pdf2ppt -v failed" }
-& $bin "$env:USERPROFILE\.cursor\skills\pdf2ppt\examples\sample.pdf" "$env:USERPROFILE\sample.pptx"
-if ($LASTEXITCODE -ne 0) { throw "convert failed" }
-$bytes = [System.IO.File]::ReadAllBytes("$env:USERPROFILE\sample.pptx")
-if ($bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4b) { throw "output is not a pptx" }
-Write-Host "PPTX_OK"
+iex (irm https://raw.githubusercontent.com/Vantagics/pdf2ppt/main/skill/pdf2ppt/scripts/install.ps1)
 ```
 
-二进制在 `$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe`，不依赖 PATH。Claude Code 把两处 `\.cursor\skills` 改成 `\.claude\skills`。Codex 改成 `\.codex\skills`。
+不需要 Go，也不需要 git。这条命令会安装发布版二进制和本技能。技能会写进已经存在的这些目录：`~/.cursor/skills`、`~/.claude/skills`、`~/.codex/skills`。如果一个都不存在，就用 `~/.cursor/skills`。只想指定一个目录时，先设置 `PDF2PPT_SKILL_DIR` 再执行。
 
-成功时：脚本打印 `PDF2PPT_BIN=`，`-v` 打出版本号，最后一行是 `PPTX_OK`。失败就整段再跑一次。校验和不一致时，不会留下一个半截的二进制文件。
+检查：`~/.local/bin/pdf2ppt -v` 打出版本号，并且 `~/.cursor/skills/pdf2ppt/SKILL.md` 存在（或你指定的那个目录）。Windows 上是 `& "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe" -v`。然后对智能体说：`convert report.pdf to pptx`。
 
-装好之后，新开一个智能体会话，对它说：`convert report.pdf to pptx`。它应该用上面的绝对路径，对 `report.pdf` 运行命令，并写出 `report.pptx`（或你指定的路径）。如果它始终不运行命令，说明技能目录不是这个智能体在读的那个目录。
+<details>
+<summary>手动安装</summary>
+
+从[最新发布](https://github.com/Vantagics/pdf2ppt/releases/latest)下载 `pdf2ppt_<操作系统>_<架构>`（Windows 带 `.exe`）和 `pdf2ppt-skill.tar.gz`，对照 `SHA256SUMS` 核对。把二进制放到 `~/.local/bin/pdf2ppt`（并 `chmod +x`），或 `%LOCALAPPDATA%\pdf2ppt\pdf2ppt.exe`。解压技能包，使 `SKILL.md` 位于 `~/.cursor/skills/pdf2ppt/SKILL.md`。
+
+</details>
 
 ## 怎么运行
 
@@ -80,7 +41,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.3.1
+pdf2ppt 1.3.2
 usage: pdf2ppt input.pdf output.pptx
 ```
 

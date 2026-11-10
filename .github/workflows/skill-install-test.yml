@@ -33,7 +33,7 @@ jobs:
               exit 1
             fi
           fi
-          sh -s -- --skill-dir "$HOME/.cursor/skills" < skill/pdf2ppt/scripts/install.sh
+          sh -s < skill/pdf2ppt/scripts/install.sh
           test -f "$HOME/.cursor/skills/pdf2ppt/SKILL.md"
           test -x "$HOME/.local/bin/pdf2ppt"
           "$HOME/.local/bin/pdf2ppt" -v
@@ -51,9 +51,7 @@ jobs:
       - name: Follow the README PowerShell install block
         shell: pwsh
         run: |
-          $dst = Join-Path $env:TEMP "pdf2ppt-install.ps1"
-          Copy-Item -Force skill/pdf2ppt/scripts/install.ps1 $dst
-          powershell -ExecutionPolicy Bypass -File $dst -SkillDir "$env:USERPROFILE\.cursor\skills"
+          Get-Content skill/pdf2ppt/scripts/install.ps1 -Raw | Invoke-Expression
           if (-not (Test-Path "$env:USERPROFILE\.cursor\skills\pdf2ppt\SKILL.md")) { throw "SKILL.md missing" }
           $bin = "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe"
           & $bin -v

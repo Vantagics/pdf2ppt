@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.8
+
+`he-openu-a11y` page 13 footer is one paragraph again, and the gap after באיתור is 6.7 pt. Office cloud fonts keep their PDF names, from Microsoft's March 12, 2025 cloud-font table plus Lato, Anton, Montserrat, Open Sans, Roboto, Poppins, Raleway, Nunito, and Noto Sans. `psumac-keynote` pages 1 and 30 use Source Sans Pro at the PDF size; that change landed in v1.5.7.
+
 ## v1.5.7
 
 Office cloud fonts keep their name: Lato, Anton, Montserrat, Open Sans, Roboto, Poppins, and a short list of the same kind. Calibri is only the fallback for a face that is not on that list. `canva-rotary` pages 8 and 16 stay in Lato, with no extra character spacing. Page 1 stays in Anton. `he-openu-a11y` page 13 has the 6.7 pt gap after באיתור again.

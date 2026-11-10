@@ -693,6 +693,15 @@ func tightenHeldFences(p *Page) {
 		inkEnd := pred.X + ink
 		gap := fence.X - inkEnd
 		if gap < 0.6 || gap > 8 {
+			// Cambria Math's box is a little wider than the Times estimate,
+			// so the gap reads about 18 pt. The boundary space still has
+			// to be in a:t or "ρg" glues to the next run.
+			if gap > -2 && gap < 20 && !strings.HasSuffix(pred.Content, " ") {
+				pred.Content += " "
+				if n := len(pred.Runs); n > 0 {
+					pred.Runs[n-1].Content += " "
+				}
+			}
 			continue
 		}
 		oldRight := fence.X + fence.Width
@@ -1000,10 +1009,9 @@ func pullBackOverlaps(p *Page) {
 		// points. Only a real collision (Andy through Morodo) is pulled back.
 		// Never move the next box. v1.5.4 parked it on this box's right
 		// edge, and every later word shifted ("youregistered", kaist p18).
-		// A cloud font is drawn at the PDF width. Shortening the box
-		// clips the last letter; widening it lets that letter run
-		// into the next word.
-		if isOfficeCloudFont(a.FontName) {
+		// Canva display faces: the PDF box is the advance. Shortening
+		// it clips the last letter.
+		if keepPDFBox(a.FontName) {
 			continue
 		}
 		wordEdge := strings.HasSuffix(a.Content, " ") || strings.HasPrefix(b.Content, " ")

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.8
+
+The page-13 footer is one Arimo/Arial paragraph again, as in v1.5.3. A line with two colons is joined; the 50 line has one colon and stays in separate boxes. The comma stays on בניווט, so the gap after באיתור is 6.7 pt.
+
+Cloud fonts keep their PDF name. The list is Microsoft's "Cloud fonts in Office" table (March 12, 2025) plus the compatibility faces Microsoft 365 downloads for existing files: Lato, Anton, Montserrat, Open Sans, Roboto, Poppins, Raleway, Nunito, and Noto Sans. A face that is not on the list can still fall back to Calibri. When a metric twin is installed (Tinos for Times, Carlito for Calibri), the size is still fitted and the original name stays.
+
+psumac-keynote pages 1 and 30 dropped in v1.5.7, not earlier. From v1.4.0 through v1.5.6 the titles were Noto Sans at a size fitted to Noto (page 1 "Scripting the Unscriptable" at 91.05 pt, page 30 "Prerequisites" at 95.80 pt). v1.5.7 keeps Source Sans Pro, which is on Microsoft's list, at the PDF size (102.60 pt and 108.00 pt). Putting Noto back would undo that. The real face at the PDF size stays.
+
 ## 1.5.7
 
 Microsoft 365 already has Lato, Anton, Montserrat, Open Sans, Roboto, and Poppins as cloud fonts. v1.5.6 rewrote Lato to Calibri, so canva-rotary page 8 dropped to 0.9130 from 0.9218. Those faces keep their PDF name. Spacing is adjusted only when the real font is installed and its advance misses the PDF width. Lato is not installed here, and its PDF widths are the cloud font's widths, so spc stays 0. Calibri remains the fallback for a face that is not on that list.

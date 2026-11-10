@@ -21,11 +21,12 @@ func fitRun(family string, bold, italic bool, size, pdfWidth float64, text strin
 	if size < 0.5 || pdfWidth < 0.5 || strings.TrimSpace(text) == "" {
 		return family, size, 0
 	}
-	// Office cloud fonts are downloaded by Microsoft 365. Renaming them
-	// to Noto Sans or Calibri draws a different face. The PDF advances
-	// already are that face, so the size and spacing stay.
+	// Office cloud fonts keep their PDF name. When a metric twin is
+	// installed (Tinos for Times, Carlito for Calibri), still fit the
+	// size so a parenthesis stays on the ink. Lato has no twin here,
+	// and its PDF widths are already the cloud face, so it is unchanged.
 	if isOfficeCloudFont(family) {
-		return family, size, 0
+		return fitCloudFace(family, bold, italic, size, pdfWidth, text)
 	}
 	family = preferMetricFamily(family)
 	path, resolved, ok := matchSystemFont(family, bold, italic)
@@ -54,30 +55,66 @@ func fitRun(family string, bold, italic bool, size, pdfWidth float64, text strin
 // make measured ink match pdfWidth. Spacing is applied between characters,
 // not after the last one.
 
-// officeCloudFonts are faces Microsoft 365 downloads on demand into
-// AppData\Local\Microsoft\FontCache\4\CloudFonts. The PDF advances are
-// that face, so the typeface name stays and spc stays near zero.
-// Faces that are not in this list still fall back to Calibri or the
-// local metric match.
-var officeCloudFonts = []string{
-	"lato",
-	"anton",
-	"montserrat",
-	"open sans",
-	"roboto",
-	"poppins",
-	"oswald",
-	"raleway",
-	"nunito",
-	"inter",
-	"source sans",
+func fitCloudFace(family string, bold, italic bool, size, pdfWidth float64, text string) (string, float64, float64) {
+	path, resolved, ok := matchSystemFont(preferMetricFamily(family), bold, italic)
+	if !ok || (!fontNamesClose(family, resolved) && !metricTwin(family, resolved)) {
+		return family, size, 0
+	}
+	measured, covered := measureText(path, size, text)
+	if !covered || measured < 0.5 {
+		return family, size, 0
+	}
+	sz, tr := trackingFor(text, size, pdfWidth, measured, func(sz float64) float64 {
+		w, ok := measureText(path, sz, text)
+		if !ok {
+			return 0
+		}
+		return w
+	})
+	return family, sz, tr
+}
+
+func metricTwin(want, got string) bool {
+	w := strings.ToLower(want)
+	g := strings.ToLower(got)
+	twins := [][2]string{
+		{"times new roman", "tinos"},
+		{"times", "tinos"},
+		{"arial", "liberation sans"},
+		{"arial", "arimo"},
+		{"calibri", "carlito"},
+		{"cambria", "caladea"},
+		{"courier new", "liberation mono"},
+	}
+	for _, p := range twins {
+		if (strings.Contains(w, p[0]) && strings.Contains(g, p[1])) || (strings.Contains(w, p[1]) && strings.Contains(g, p[0])) {
+			return true
+		}
+	}
+	return false
+}
+
+// keepPDFBox is a display face whose PDF box already matches the
+// cloud font's advance. Pulling that box back clips the last letter.
+func keepPDFBox(family string) bool {
+	n := strings.ToLower(family)
+	for _, f := range []string{"lato", "anton", "montserrat", "poppins", "raleway", "oswald", "bebas"} {
+		if strings.Contains(n, f) {
+			return true
+		}
+	}
+	return false
 }
 
 func isOfficeCloudFont(family string) bool {
 	n := strings.ToLower(family)
-	n = strings.ReplaceAll(n, "-", " ")
-	for _, f := range officeCloudFonts {
-		if strings.Contains(n, f) {
+	n = strings.NewReplacer("-", " ", "_", " ", ",", " ").Replace(n)
+	n = strings.Join(strings.Fields(n), " ")
+	if _, ok := officeCloudFontFamilies[n]; ok {
+		return true
+	}
+	for f := range officeCloudFontFamilies {
+		if strings.HasPrefix(n, f+" ") {
 			return true
 		}
 	}

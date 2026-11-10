@@ -116,6 +116,16 @@ func joinCloseRTLPairs(p *Page) {
 			if len(g) < 2 || !lineHasRTL(g) {
 				continue
 			}
+			// Two or more colons is the page-13 footer, which v1.5.3 drew
+			// as one Arimo paragraph. The 50 line has a single colon and
+			// stays in separate boxes.
+			if colonCount(g) >= 2 {
+				p.Elements[g[0].i].Text = joinRTLReading(g)
+				for _, r := range g[1:] {
+					remove[r.i] = true
+				}
+				continue
+			}
 			// Only a Hebrew word and its neighbor (the name, or בישראל
 			// next to 1,600,000). Joining a whole line packs the glyphs
 			// and glues "OCR" to the following Hebrew.
@@ -349,4 +359,97 @@ func lineHasRTL(line []textRef) bool {
 		}
 	}
 	return false
+}
+
+func colonCount(line []textRef) int {
+	n := 0
+	for _, r := range line {
+		n += strings.Count(r.t.Content, ":")
+	}
+	return n
+}
+
+// joinRTLReading builds one RTL paragraph, right-hand fragment first.
+// The longest fragment supplies the face and the size, which is how
+// v1.5.3 drew the page-13 footer as one Arimo line.
+func joinRTLReading(g []textRef) *TextObject {
+	items := make([]*TextObject, len(g))
+	for i := range g {
+		items[i] = g[i].t
+	}
+	best := items[0]
+	for _, t := range items[1:] {
+		if utf8.RuneCountInString(strings.TrimSpace(t.Content)) > utf8.RuneCountInString(strings.TrimSpace(best.Content)) {
+			best = t
+		}
+	}
+	var b strings.Builder
+	var prev *TextObject
+	for i := len(items) - 1; i >= 0; i-- {
+		t := items[i]
+		piece := strings.TrimSpace(t.Content)
+		if piece == "" {
+			continue
+		}
+		if prev != nil && rtlWordSeparator(prev, t) {
+			b.WriteByte(' ')
+		}
+		b.WriteString(piece)
+		prev = t
+	}
+	out := *best
+	out.Content = b.String()
+	out.RTL = true
+	out.Runs = nil
+	out.holdX = true
+	out.Tracking = 0
+	minX, minY := items[0].X, items[0].Y
+	maxR, maxB := items[0].X+items[0].Width, items[0].Y+items[0].Height
+	for _, t := range items[1:] {
+		if t.X < minX {
+			minX = t.X
+		}
+		if t.X+t.Width > maxR {
+			maxR = t.X + t.Width
+		}
+		if t.Y < minY {
+			minY = t.Y
+		}
+		if t.Y+t.Height > maxB {
+			maxB = t.Y + t.Height
+		}
+	}
+	out.X, out.Y = minX, minY
+	out.Width, out.Height = maxR-minX, maxB-minY
+	if out.Width < 1 {
+		out.Width = 1
+	}
+	return &out
+}
+
+func rtlWordSeparator(right, left *TextObject) bool {
+	piece := strings.TrimSpace(left.Content)
+	if piece == "" {
+		return false
+	}
+	rightS := strings.TrimSpace(right.Content)
+	if rightS == "•" || strings.HasSuffix(rightS, ":") {
+		return true
+	}
+	if neutralPunct(piece) {
+		return false
+	}
+	return true
+}
+
+func neutralPunct(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsPunct(r) && r != ':' {
+			return false
+		}
+	}
+	return true
 }

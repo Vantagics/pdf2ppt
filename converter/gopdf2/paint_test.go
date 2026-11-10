@@ -277,3 +277,112 @@ func TestMITSlidePaint(t *testing.T) {
 		t.Fatal("page 23 lost the courseware line")
 	}
 }
+
+func TestBakeWhiteLogoOntoBackground(t *testing.T) {
+	bg := image.NewNRGBA(image.Rect(0, 0, 20, 10))
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 20; x++ {
+			bg.SetNRGBA(x, y, color.NRGBA{R: 0, G: 40, B: 140, A: 255})
+		}
+	}
+	logo := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			logo.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+		}
+	}
+	logo.SetNRGBA(0, 0, color.NRGBA{A: 0})
+	var bgBuf, logoBuf bytes.Buffer
+	if err := png.Encode(&bgBuf, bg); err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(&logoBuf, logo); err != nil {
+		t.Fatal(err)
+	}
+	p := &Page{Elements: []PageElement{
+		{Image: &ImageObject{Data: bgBuf.Bytes(), Format: "png", X: 0, Y: 0, Width: 20, Height: 10}},
+		{Image: &ImageObject{Data: logoBuf.Bytes(), Format: "png", X: 4, Y: 2, Width: 4, Height: 4}},
+	}}
+	bakeAlphaOverlays(p)
+	if len(p.Elements) != 1 {
+		t.Fatalf("overlay still separate: %d elements", len(p.Elements))
+	}
+	img, err := png.Decode(bytes.NewReader(p.Elements[0].Image.Data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Logo covers x 4..8 of 20 px, so pixel x=5 should be white.
+	r, g, b, _ := img.At(5, 3).RGBA()
+	if r>>8 < 240 || g>>8 < 240 || b>>8 < 240 {
+		t.Fatalf("baked pixel %d,%d,%d", r>>8, g>>8, b>>8)
+	}
+}
+
+func TestDeviceGrayIsNeutral(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		cs      string
+		extra   []string
+		want    byte
+		stroke  bool
+	}{
+		{name: "g", content: "0.25 g 0 0 30 20 re f\n", want: 64},
+		{name: "G", content: "0.50 G 2 w 0 0 30 20 re S\n", want: 128, stroke: true},
+		{name: "cs", content: "/DeviceGray cs 0.25 sc 0 0 30 20 re f\n", want: 64},
+		{name: "named", content: "/DG cs 0.50 sc 0 0 30 20 re f\n", cs: "/DG /DeviceGray", want: 128},
+		{name: "calgray", content: "/CG cs 0 sc 0 0 30 20 re f\n", cs: "/CG [/CalGray << /WhitePoint [0.9505 1 1.089] >>]", want: 0},
+		{name: "icc", content: "/IG cs 1 sc 0 0 30 20 re f\n", cs: "/IG [/ICCBased 5 0 R]", extra: []string{"<< /N 1 /Length 4 >>\nstream\nxxxx\nendstream"}, want: 255},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := "<< >>"
+			if tc.cs != "" {
+				res = "<< /ColorSpace << " + tc.cs + " >> >>"
+			}
+			objs := []string{
+				"<< /Type /Catalog /Pages 2 0 R >>",
+				"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+				fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 40 30] /Resources %s /Contents 4 0 R >>", res),
+				fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(tc.content), tc.content),
+			}
+			objs = append(objs, tc.extra...)
+			p := openPDF(t, pdfBytes(objs))
+			var gotR, gotG, gotB uint8
+			var found bool
+			for _, el := range p.Elements {
+				if el.Shape == nil {
+					continue
+				}
+				if tc.stroke && el.Shape.HasStroke {
+					gotR, gotG, gotB = el.Shape.StrokeR, el.Shape.StrokeG, el.Shape.StrokeB
+					found = true
+				}
+				if !tc.stroke && el.Shape.HasFill {
+					gotR, gotG, gotB = el.Shape.FillR, el.Shape.FillG, el.Shape.FillB
+					found = true
+				}
+			}
+			if !tc.stroke && p.HasBackground && !found {
+				gotR, gotG, gotB = p.BgR, p.BgG, p.BgB
+				found = true
+			}
+			if !found {
+				t.Fatal("no painted color")
+			}
+			if gotR != gotG || gotG != gotB {
+				t.Fatalf("gray became RGB %d,%d,%d", gotR, gotG, gotB)
+			}
+			if absDiff(gotR, tc.want) > 2 {
+				t.Fatalf("level %d, want %d", gotR, tc.want)
+			}
+		})
+	}
+}
+
+func absDiff(a, b byte) byte {
+	if a > b {
+		return a - b
+	}
+	return b - a
+}

@@ -1,5 +1,13 @@
 # Compatibility notes
 
+## v1.3.8
+
+Ten more decks are in `manifest.json` (NeurIPS Google Slides, two Beijing statistics decks, NBS/Alibaba, Korean PowerPoint, UNDP Arabic, another WPS file, a Japanese Google deck, and a Canva workshop).
+
+DeviceGray through a named color space or an ICC profile with N=1 is neutral gray, not blue. The Tencent wordmark is baked into the background image so PowerPoint cannot turn the soft-mask white into black.
+
+Still open: UNDP Arabic labels whose ToUnicode map only contains comma and percent; the NeurIPS “800” is the character U+0038 in the file; a Keynote Type 1C icon with no ToUnicode is still `$`.
+
 ## v1.3.7
 
 Caption word spaces around 0.2 em are kept (`Getty images`, `Amadeu Pons`). Indexed images use their palette, so the Tencent wordmark stays white. The mine-safety “四” badge is the blue shading from its sampled function. A widely spaced `()` in the KUST formula is split into the two parentheses.

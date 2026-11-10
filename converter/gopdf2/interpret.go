@@ -314,6 +314,8 @@ type interp struct {
 	bgGrad      *Gradient
 	elements    []PageElement
 	formDepth   int
+	// ocSkip counts marked-content groups whose optional content is off.
+	ocSkip int
 }
 
 func interpretPage(content []byte, res *resources, originX, originY, width, height float64) *Page {
@@ -427,15 +429,15 @@ func (ip *interp) exec(op string, st *[]token) {
 		ip.gs.strokeN = 4
 	case "cs":
 		name := popName(st)
-		ip.gs.fillN = csComponents(name)
-		ip.gs.fillIsPat = name == "Pattern"
+		ip.gs.fillN = ip.res.numComponents(name)
+		ip.gs.fillIsPat = name == "Pattern" || ip.res.isPatternSpace(name)
 		if ip.gs.fillIsPat {
 			ip.gs.fillGrad = nil
 			ip.gs.fillTile = nil
 		}
 	case "CS":
 		name := popName(st)
-		ip.gs.strokeN = csComponents(name)
+		ip.gs.strokeN = ip.res.numComponents(name)
 	case "sc":
 		ip.popColor(st, ip.gs.fillN, true)
 	case "scn":
@@ -556,14 +558,30 @@ func (ip *interp) exec(op string, st *[]token) {
 		ip.showString(raw, 0)
 	case "Do":
 		ip.doXObject(popName(st))
-	case "BMC", "MP":
+	case "BMC":
+		popName(st)
+		if ip.ocSkip > 0 {
+			ip.ocSkip++
+		}
+	case "MP":
 		popName(st)
 	case "BDC", "DP":
+		var prop string
 		if len(*st) > 0 {
+			last := (*st)[len(*st)-1]
 			*st = (*st)[:len(*st)-1]
+			if last.kind == tkName {
+				prop = last.text
+			}
 		}
-		popName(st)
+		tag := popName(st)
+		if ip.ocSkip > 0 || (tag == "OC" && ip.res.ocHidden(prop)) {
+			ip.ocSkip++
+		}
 	case "EMC":
+		if ip.ocSkip > 0 {
+			ip.ocSkip--
+		}
 	default:
 		// drop a trailing operand if this was a no-op we don't model
 	}
@@ -571,12 +589,202 @@ func (ip *interp) exec(op string, st *[]token) {
 
 func csComponents(name string) int {
 	switch name {
-	case "DeviceGray", "G":
+	case "DeviceGray", "G", "CalGray":
 		return 1
 	case "DeviceCMYK", "CMYK":
 		return 4
+	case "DeviceRGB", "RGB", "CalRGB", "Lab":
+		return 3
 	default:
 		return 3
+	}
+}
+
+// numComponents is how many numbers sc/SC consume. A named DeviceGray or an
+// ICC profile with N=1 is one number. Treating that number as RGB stores it
+// in the blue channel, which is why PDFMaker pages came out #0000FF.
+func (r *resources) numComponents(name string) int {
+	switch name {
+	case "DeviceGray", "G", "CalGray":
+		return 1
+	case "DeviceRGB", "RGB", "CalRGB", "Lab":
+		return 3
+	case "DeviceCMYK", "CMYK":
+		return 4
+	case "Pattern":
+		return 0
+	}
+	if r == nil {
+		return 3
+	}
+	if n, ok := componentsOf(r.xrd, r.colorSpaceObj(name)); ok {
+		return n
+	}
+	if r.parent != nil {
+		return r.parent.numComponents(name)
+	}
+	return 3
+}
+
+func (r *resources) isPatternSpace(name string) bool {
+	if name == "Pattern" || r == nil {
+		return name == "Pattern"
+	}
+	o := r.colorSpaceObj(name)
+	if o == nil {
+		if r.parent != nil {
+			return r.parent.isPatternSpace(name)
+		}
+		return false
+	}
+	o, err := r.xrd.Dereference(o)
+	if err != nil || o == nil {
+		return false
+	}
+	arr, ok := o.(types.Array)
+	if !ok || len(arr) == 0 {
+		return false
+	}
+	nm, ok := arr[0].(types.Name)
+	return ok && nm.Value() == "Pattern"
+}
+
+func (r *resources) ocHidden(name string) bool {
+	if r == nil || name == "" || r.xrd == nil {
+		return false
+	}
+	props := r.sub("Properties")
+	if props == nil {
+		if r.parent != nil {
+			return r.parent.ocHidden(name)
+		}
+		return false
+	}
+	o, ok := props.Find(name)
+	if !ok {
+		return false
+	}
+	off := ocOffSet(r.xrd)
+	if ir, ok := o.(types.IndirectRef); ok {
+		return off[int(ir.ObjectNumber)]
+	}
+	d, err := r.xrd.DereferenceDict(o)
+	if err != nil || d == nil {
+		return false
+	}
+	if oc, ok := d.Find("OC"); ok {
+		if ir, ok := oc.(types.IndirectRef); ok {
+			return off[int(ir.ObjectNumber)]
+		}
+	}
+	return false
+}
+
+func ocOffSet(xrd *model.XRefTable) map[int]bool {
+	out := map[int]bool{}
+	if xrd == nil {
+		return out
+	}
+	cat, err := xrd.Catalog()
+	if err != nil || cat == nil {
+		return out
+	}
+	oc, err := xrd.DereferenceDict(cat["OCProperties"])
+	if err != nil || oc == nil {
+		return out
+	}
+	d, err := xrd.DereferenceDict(oc["D"])
+	if err != nil || d == nil {
+		return out
+	}
+	arr, err := xrd.DereferenceArray(d["OFF"])
+	if err != nil || arr == nil {
+		return out
+	}
+	for _, el := range arr {
+		if ir, ok := el.(types.IndirectRef); ok {
+			out[int(ir.ObjectNumber)] = true
+		}
+	}
+	return out
+}
+
+func (r *resources) colorSpaceObj(name string) types.Object {
+	if r == nil {
+		return nil
+	}
+	cs := r.sub("ColorSpace")
+	if cs == nil {
+		return nil
+	}
+	o, ok := cs.Find(name)
+	if !ok {
+		return nil
+	}
+	return o
+}
+
+func componentsOf(xrd *model.XRefTable, o types.Object) (int, bool) {
+	if xrd == nil || o == nil {
+		return 0, false
+	}
+	o, err := xrd.Dereference(o)
+	if err != nil || o == nil {
+		return 0, false
+	}
+	switch v := o.(type) {
+	case types.Name:
+		switch v.Value() {
+		case "DeviceGray", "G", "CalGray":
+			return 1, true
+		case "DeviceRGB", "RGB", "CalRGB", "Lab":
+			return 3, true
+		case "DeviceCMYK", "CMYK":
+			return 4, true
+		default:
+			return 0, false
+		}
+	case types.Array:
+		if len(v) == 0 {
+			return 0, false
+		}
+		kind := ""
+		if nm, ok := v[0].(types.Name); ok {
+			kind = nm.Value()
+		}
+		switch kind {
+		case "CalGray":
+			return 1, true
+		case "CalRGB", "Lab":
+			return 3, true
+		case "Indexed", "Separation":
+			return 1, true
+		case "ICCBased":
+			if len(v) < 2 {
+				return 0, false
+			}
+			sd, _, err := xrd.DereferenceStreamDict(v[1])
+			if err != nil || sd == nil {
+				return 0, false
+			}
+			if n := intEntry(xrd, sd.Dict, "N"); n > 0 {
+				return n, true
+			}
+			return 0, false
+		case "DeviceN":
+			if len(v) < 2 {
+				return 0, false
+			}
+			names, err := xrd.DereferenceArray(v[1])
+			if err != nil {
+				return 0, false
+			}
+			return len(names), true
+		default:
+			return 0, false
+		}
+	default:
+		return 0, false
 	}
 }
 
@@ -679,6 +887,11 @@ func (ip *interp) rectPath(x, y, w, h float64) {
 }
 
 func (ip *interp) paint(fill, stroke, evenOdd bool) {
+	if ip.ocSkip > 0 {
+		ip.ops = nil
+		ip.haveCur = false
+		return
+	}
 	ops := ip.ops
 	ip.ops = nil
 	ip.haveCur = false
@@ -926,7 +1139,7 @@ func (ip *interp) advance(tx float64) {
 }
 
 func (ip *interp) showTJ(arr []token) {
-	if !ip.inText {
+	if !ip.inText || ip.ocSkip > 0 {
 		return
 	}
 	var text string
@@ -984,7 +1197,7 @@ func (ip *interp) showTJ(arr []token) {
 }
 
 func (ip *interp) showString(raw []byte, extra float64) {
-	if !ip.inText {
+	if !ip.inText || ip.ocSkip > 0 {
 		return
 	}
 	// UTF-16BE literal strings (with BOM) are already Unicode, not char codes.
@@ -1682,6 +1895,9 @@ func (ip *interp) pageLen(textAdv float64) float64 {
 }
 
 func (ip *interp) doXObject(name string) {
+	if ip.ocSkip > 0 {
+		return
+	}
 	xo := ip.res.xobject(name)
 	if xo == nil || ip.formDepth > 8 {
 		return

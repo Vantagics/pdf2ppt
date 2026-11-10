@@ -227,6 +227,96 @@
       "commit": false
     },
     {
+      "id": "neurips-effxfmr",
+      "producer": "Google Slides",
+      "kind": "NeurIPS 2025 tutorial on efficient transformers",
+      "url": "https://neurips.cc/media/neurips-2025/Slides/128790_XiEHJc4.pdf",
+      "pages": 110,
+      "license": "Conference slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "aist-ohno",
+      "producer": "Google Slides",
+      "kind": "Japanese talk on LLM development and AI safety",
+      "url": "https://www.digiarc.aist.go.jp/event/4th_grand_canvas/pdf/20250304-4th-grand-canvas-03-ohno.pdf",
+      "pages": 24,
+      "license": "Conference slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "canva-mahidol-adv",
+      "producer": "Canva (iLovePDF rewrite)",
+      "kind": "Advanced Canva workshop",
+      "url": "https://stang.sc.mahidol.ac.th/training/uploads/handbook/549.pdf",
+      "pages": 28,
+      "license": "Training handbook. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "nbs-alibaba",
+      "producer": "Acrobat PDFMaker 15 for PowerPoint",
+      "kind": "bilingual NBS/Alibaba deck at 1920x1080",
+      "url": "https://www.stats.gov.cn/english/InternationalTraining/202405/P020201012502181275337.pdf",
+      "pages": 27,
+      "license": "Training slides. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "bjedu-2026",
+      "producer": "Acrobat PDFMaker 17 for PowerPoint",
+      "kind": "2025 university science-statistics training",
+      "url": "https://jw.beijing.gov.cn/kyc/zlxz_15523/202601/P020260112548317622236.pdf",
+      "pages": 145,
+      "license": "Government training material. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "bjedu-2024b",
+      "producer": "Microsoft PowerPoint 2016",
+      "kind": "Frascati Manual / R&D statistics briefing",
+      "url": "https://jw.beijing.gov.cn/kyc/zlxz_15523/202412/P020241225386847486483.pdf",
+      "pages": 85,
+      "license": "Government briefing. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "kaist-xai",
+      "producer": "Microsoft PowerPoint for Microsoft 365 (Korean)",
+      "kind": "Korean XAI workshop talk",
+      "url": "https://xai.kaist.ac.kr/static/files/2023_xai_workshop/talk5.pdf",
+      "pages": 23,
+      "license": "Workshop slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "korea-privacy",
+      "producer": "Microsoft PowerPoint 2016",
+      "kind": "Korean personal-data incident training",
+      "url": "https://www.privacy.go.kr/cmm/fms/FileDown.do?atchFileId=ATCH_000000000878664&fileSn=3",
+      "pages": 140,
+      "license": "Government training. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "undp-gender-ar",
+      "producer": "Microsoft PowerPoint for Microsoft 365",
+      "kind": "UNDP Arabic gender fact sheet",
+      "url": "https://www.undp.org/sites/g/files/zskgke326/files/2023-12/annual_gender_fact_sheet_2022_arabic_version-dec2023.pdf",
+      "pages": 13,
+      "license": "UNDP publication. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "wps-demo-case",
+      "producer": "WPS Presentation",
+      "kind": "short Chinese WPS demo",
+      "url": "https://res1.wpsacdm.cache.wpscdn.cn/files/da89cfdf6a11419aeb478b86ff0c84bf.pdf",
+      "pages": 2,
+      "license": "WPS sample. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
       "id": "chrome-skia",
       "producer": "Skia/PDF (Headless Chrome). Same PDF backend Google Slides uses; this file is printed from tests/corpus/slides.html, not downloaded from Google Slides.",
       "kind": "generated slide-like pages: gradient, rounded card, rotated text, Chinese",

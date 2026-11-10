@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.8
+
+PDFMaker names a one-channel gray color space and then emits a single number. That number was stored as the blue channel, so bjedu-2026 and nbs-alibaba came out `#0000FF`. DeviceGray, CalGray, and an ICC profile with N=1 now consume one number and paint `(g,g,g)`.
+
+The Tencent wordmark PNG is white with a soft mask. PowerPoint composites that alpha against black, so the logo stays black on the slide. The wordmark is composited onto the background image and the separate translucent picture is removed.
+
+Marked content whose optional-content group is in the catalog OFF list is not painted.
+
 ## 1.3.7
 
 Word spaces of about 0.2 em were dropped when the merge threshold moved to 0.22 em, so captions became "Gettyimages" and "AmadeuPons". The threshold is 0.15 em. Canva's per-letter boxes still overlap, so "Recognized" does not grow a space.

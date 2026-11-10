@@ -129,12 +129,15 @@ func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 		StrokeB:     textObj.StrokeB,
 		StrokeWidth: textObj.StrokeWidth,
 		Tracking:    textObj.Tracking,
+		Clip:        textObj.Clip,
+		NoFill:      textObj.NoFill,
 	}
 	for _, r := range textObj.Runs {
 		elem.Runs = append(elem.Runs, TextRun{
 			Content: r.Content, FontName: r.FontName, FontSize: r.FontSize,
 			Bold: r.Bold, Italic: r.Italic,
 			ColorR: r.ColorR, ColorG: r.ColorG, ColorB: r.ColorB,
+			Baseline: r.Baseline,
 		})
 	}
 	if elem.FontName == "" {

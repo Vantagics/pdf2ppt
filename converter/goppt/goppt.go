@@ -51,6 +51,8 @@ type TextBox struct {
 	StrokeB     uint8
 	StrokeWidth float64 // points
 	Tracking    float64 // extra points between glyphs; negative tightens
+	Clip        bool
+	NoFill      bool
 	Runs        []TextRun
 }
 
@@ -65,6 +67,8 @@ type TextRun struct {
 	ColorG   uint8
 	ColorB   uint8
 	Tracking float64
+	// Baseline is the OOXML baseline shift, in 1000ths of a percent.
+	Baseline float64
 }
 
 // PathOp is a shape-local path command. Coordinates are EMU, y grows down.

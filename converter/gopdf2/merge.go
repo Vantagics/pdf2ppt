@@ -113,6 +113,9 @@ func sameLine(a, b *TextObject) bool {
 	if a.Stroke != b.Stroke || a.StrokeOnly != b.StrokeOnly {
 		return false
 	}
+	if a.NoFill != b.NoFill {
+		return false
+	}
 	em := math.Max(a.FontSize, b.FontSize)
 	return math.Abs(baseline(a)-baseline(b)) <= math.Max(1.25, em*0.18)
 }
@@ -214,6 +217,14 @@ func buildMerged(ts []*TextObject) *TextObject {
 		ColorG:   runs[0].ColorG,
 		ColorB:   runs[0].ColorB,
 	}
+	allHidden := true
+	for _, t := range cp {
+		if !t.NoFill {
+			allHidden = false
+			break
+		}
+	}
+	out.NoFill = allHidden
 	if len(runs) > 1 {
 		out.Runs = runs
 		// The box size is the largest run. The first run keeps its own size.
@@ -308,5 +319,210 @@ func startsWithCJK(s string) bool {
 func sameStyle(a, b TextRun) bool {
 	return a.FontName == b.FontName && a.Bold == b.Bold && a.Italic == b.Italic &&
 		a.ColorR == b.ColorR && a.ColorG == b.ColorG && a.ColorB == b.ColorB &&
-		math.Abs(a.FontSize-b.FontSize) < 1
+		math.Abs(a.FontSize-b.FontSize) < 1 && math.Abs(a.Baseline-b.Baseline) < 1
+}
+
+// attachSubscripts folds a small glyph that sits just below a letter into
+// that letter's text box as a baseline-shifted run. A same-size number such
+// as 2024 shares the body's baseline and size, so it stays its own text.
+func attachSubscripts(p *Page) {
+	type ref struct {
+		i int
+		t *TextObject
+	}
+	var refs []ref
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t == nil || !horizontal(t.Rotation) || t.Content == "" {
+			continue
+		}
+		refs = append(refs, ref{i, t})
+	}
+	remove := map[int]bool{}
+	type pair struct {
+		body *TextObject
+		sub  *TextObject
+		si   int
+	}
+	var pairs []pair
+	for _, sub := range refs {
+		if !subscriptCandidate(sub.t) {
+			continue
+		}
+		for i := range refs {
+			b := &refs[i]
+			if b.i == sub.i || subscriptCandidate(b.t) || !subscriptHost(b.t, sub.t) {
+				continue
+			}
+			pairs = append(pairs, pair{b.t, sub.t, sub.i})
+			break
+		}
+	}
+	// Rightmost subscript first so earlier cut indexes stay put.
+	for i := 1; i < len(pairs); i++ {
+		for j := i; j > 0 && pairs[j].sub.X > pairs[j-1].sub.X; j-- {
+			pairs[j], pairs[j-1] = pairs[j-1], pairs[j]
+		}
+	}
+	for _, pair := range pairs {
+		if remove[pair.si] {
+			continue
+		}
+		insertSubscript(pair.body, pair.sub)
+		remove[pair.si] = true
+	}
+	if len(remove) == 0 {
+		return
+	}
+	kept := p.Elements[:0]
+	for i, el := range p.Elements {
+		if remove[i] {
+			continue
+		}
+		kept = append(kept, el)
+	}
+	p.Elements = kept
+}
+
+func subscriptCandidate(t *TextObject) bool {
+	n := utf8.RuneCountInString(strings.TrimSpace(t.Content))
+	return n >= 1 && n <= 2
+}
+
+func subscriptHost(body, sub *TextObject) bool {
+	if body.FontSize < 1 || sub.FontSize < 1 {
+		return false
+	}
+	if sub.FontSize/body.FontSize > 0.75 {
+		return false
+	}
+	delta := baseline(sub) - baseline(body)
+	em := body.FontSize
+	if delta < em*0.08 || delta > em*0.55 {
+		return false
+	}
+	if sub.X+sub.Width < body.X-em*0.15 || sub.X > body.X+body.Width+em*0.4 {
+		return false
+	}
+	return true
+}
+
+func insertSubscript(body, sub *TextObject) {
+	runs := body.Runs
+	if len(runs) == 0 {
+		runs = []TextRun{{
+			Content: body.Content, FontName: body.FontName, FontSize: body.FontSize,
+			Bold: body.Bold, Italic: body.Italic,
+			ColorR: body.ColorR, ColorG: body.ColorG, ColorB: body.ColorB,
+		}}
+	}
+	total := 0
+	for _, r := range runs {
+		total += utf8.RuneCountInString(r.Content)
+	}
+	if total < 1 || body.Width < 0.5 {
+		return
+	}
+	rel := (sub.X - body.X) / body.Width
+	if rel < 0 {
+		rel = 0
+	}
+	if rel > 1 {
+		rel = 1
+	}
+	at := int(math.Round(rel * float64(total)))
+	if at < 1 {
+		at = 1
+	}
+	if at > total {
+		at = total
+	}
+	drop := baseline(sub) - baseline(body)
+	pct := -drop / body.FontSize * 100000
+	if pct > -8000 {
+		pct = -8000
+	}
+	if pct < -60000 {
+		pct = -60000
+	}
+	subRun := TextRun{
+		Content: sub.Content, FontName: sub.FontName, FontSize: sub.FontSize,
+		Bold: sub.Bold, Italic: sub.Italic,
+		ColorR: sub.ColorR, ColorG: sub.ColorG, ColorB: sub.ColorB,
+		Baseline: pct,
+	}
+	var next []TextRun
+	seen := 0
+	inserted := false
+	for _, r := range runs {
+		n := utf8.RuneCountInString(r.Content)
+		if inserted || seen+n < at {
+			next = append(next, r)
+			seen += n
+			continue
+		}
+		cut := at - seen
+		rs := []rune(r.Content)
+		if cut > 0 {
+			left := r
+			left.Content = string(rs[:cut])
+			next = append(next, left)
+		}
+		next = append(next, subRun)
+		if cut < len(rs) {
+			right := r
+			right.Content = string(rs[cut:])
+			next = append(next, right)
+		}
+		inserted = true
+		seen += n
+	}
+	if !inserted {
+		next = append(next, subRun)
+	}
+	body.Runs = next
+	var text string
+	for _, r := range next {
+		text += r.Content
+	}
+	body.Content = text
+}
+
+// pullBackOverlaps shortens a run whose box runs through the next word on
+// the same line. "per Andy" was wider than the gap before "Morodo", so
+// PowerPoint drew "pMAndy".
+func pullBackOverlaps(p *Page) {
+	var refs []textRef
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t == nil || !horizontal(t.Rotation) {
+			continue
+		}
+		refs = append(refs, textRef{i, t})
+	}
+	sortRefs(refs)
+	for i := 0; i+1 < len(refs); i++ {
+		a, b := refs[i].t, refs[i+1].t
+		if a.Content == "" || b.Content == "" || a.Content == b.Content {
+			continue
+		}
+		em := math.Max(a.FontSize, b.FontSize)
+		if math.Abs(baseline(a)-baseline(b)) > math.Max(1.5, em*0.35) {
+			continue
+		}
+		if b.X <= a.X || b.X >= a.X+a.Width-0.8 {
+			continue
+		}
+		old := a.Width
+		nw := b.X - a.X - 0.4
+		if nw < em*0.4 {
+			continue
+		}
+		gaps := utf8.RuneCountInString(a.Content) - 1
+		if gaps > 0 && len(a.Runs) == 0 {
+			a.Tracking += (nw - old) / float64(gaps)
+		}
+		a.Width = nw
+		a.Clip = true
+	}
 }

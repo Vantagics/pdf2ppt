@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.3
+
+cesar2025-ai page 14 is Type 3 text: each letter is a glyph outline, and Noto Sans in its place was the 0.686 slide. Those outlines are drawn, and the characters stay in the text box with no fill so recall is unchanged. CJK stays filled text.
+
+A small glyph that sits just below a letter (a smaller size and a lower baseline) joins that line as a run with `baseline` around `-25000`. A same-size number such as 2024 does not. On the KUST formula that makes `p₂ = p₁ + ρg(z…)`.
+
+The Keynote lock on psumac page 30 is a symbolic TrueType glyph whose code is `$`. An isolated non-letter from that kind of font is drawn as the glyph outline. A comma that joins a sentence stays text.
+
+NBS logo JPEGs carried a soft mask that was solid white. That mask no longer forces a PNG re-encode, so the marks stay the original JPEG. A text box that runs through the next word on the same line is pulled back and clipped (`per Andy` no longer covers `Morodo`).
+
+`mit-ocw-ses1` is in the corpus manifest. `fetch.py` records that `tsmc-2q25-zh` currently returns a Cloudflare 403.
+
 ## 1.4.2
 
 A clip no longer decodes a JPEG and writes it back as a PNG. DCT bytes pass through, and the crop is an `a:srcRect`. A PNG is still cropped in the file, because keeping the uncropped bitmap was larger (the UAI repeats). A page-sized JPEG with no alpha is not flattened. A soft-masked photo that comes out opaque is a JPEG again. `TestPictureCountBaseline` fails when a deck is more than 10% larger than its stored v1.4.0 size.

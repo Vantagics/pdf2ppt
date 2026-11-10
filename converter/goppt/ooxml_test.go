@@ -38,6 +38,19 @@ func TestTextOutline(t *testing.T) {
 	}
 }
 
+func TestSubscriptBaseline(t *testing.T) {
+	xml := formatTextRun(&TextBox{}, TextRun{
+		Content: "2", FontName: "Tinos", FontSize: 17, Baseline: -25000,
+	})
+	if !strings.Contains(xml, `baseline="-25000"`) {
+		t.Fatalf("subscript baseline missing: %s", xml)
+	}
+	plain := formatTextRun(&TextBox{}, TextRun{Content: "2024", FontName: "Tinos", FontSize: 32})
+	if strings.Contains(plain, "baseline=") {
+		t.Fatalf("a normal run grew a baseline: %s", plain)
+	}
+}
+
 func TestImageSrcRect(t *testing.T) {
 	xml := formatImage(&Image{
 		X: 1, Y: 2, Width: 100, Height: 80,

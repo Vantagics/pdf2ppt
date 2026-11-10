@@ -74,6 +74,9 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 		applyRotation(page, inh.Rotate)
 	}
 	mergeTextLines(page)
+	attachSubscripts(page)
+	pullBackOverlaps(page)
+	replaceIsolatedSymbols(page)
 	page.syncLists()
 	return page, nil
 }

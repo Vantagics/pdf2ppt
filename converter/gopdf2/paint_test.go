@@ -160,6 +160,77 @@ func TestNBSCardsAreGradients(t *testing.T) {
 	}
 }
 
+func TestSubscriptJoinsBelowALetter(t *testing.T) {
+	body := &TextObject{Content: "p = p", FontName: "Tinos", FontSize: 32, X: 100, Y: 100, Width: 80, Height: 36}
+	sub := &TextObject{Content: "2", FontName: "Tinos", FontSize: 16, X: 108, Y: 124, Width: 10, Height: 18}
+	year := &TextObject{Content: "2024", FontName: "Tinos", FontSize: 32, X: 200, Y: 100, Width: 60, Height: 36}
+	p := &Page{Elements: []PageElement{{Text: body}, {Text: sub}, {Text: year}}}
+	attachSubscripts(p)
+	if len(p.TextObjects) != 0 && len(p.Elements) != 2 {
+		// TextObjects is filled by syncLists; Elements is what attach edits.
+	}
+	if len(p.Elements) != 2 {
+		t.Fatalf("elements %d, want body+year (subscript folded in)", len(p.Elements))
+	}
+	if body.Content != "p2 = p" || year.Content != "2024" {
+		t.Fatalf("body %q year %q", body.Content, year.Content)
+	}
+	var base float64
+	for _, r := range body.Runs {
+		if r.Content == "2" {
+			base = r.Baseline
+		}
+	}
+	if base > -18000 || base < -32000 {
+		t.Fatalf("baseline %v, want about -25000", base)
+	}
+}
+
+func TestPsumacLockIsOutline(t *testing.T) {
+	doc, err := Open("/tmp/corpus/psumac.pdf")
+	if err != nil {
+		t.Skip(err)
+	}
+	p, err := doc.GetPage(29)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tObj := range p.TextObjects {
+		if strings.TrimSpace(tObj.Content) == "$" {
+			t.Fatalf("lock is still the text %q", tObj.Content)
+		}
+	}
+	var shapes int
+	for _, el := range p.Elements {
+		if el.Shape != nil && el.Shape.Width > 200 && el.Shape.Height > 200 && len(el.Shape.Path) > 4 {
+			shapes++
+		}
+	}
+	if shapes == 0 {
+		t.Fatal("no large outline for the lock")
+	}
+}
+
+func TestNBSLogoKeepsJPEG(t *testing.T) {
+	doc, err := Open("/tmp/corpus/nbs-alibaba.pdf")
+	if err != nil {
+		t.Skip(err)
+	}
+	p, err := doc.GetPage(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var jpeg int
+	for _, im := range p.Images {
+		if im.Format == "jpeg" && im.Width > 40 && im.Width < 80 {
+			jpeg++
+		}
+	}
+	if jpeg < 10 {
+		t.Fatalf("logo jpegs %d, opaque soft masks were still re-encoded", jpeg)
+	}
+}
+
 func TestRotatePageKeepsTextUpright(t *testing.T) {
 	p := &Page{Width: 612, Height: 792, Elements: []PageElement{{
 		Text: &TextObject{

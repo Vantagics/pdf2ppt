@@ -2,6 +2,7 @@
 """Download the external corpus into tests/corpus/cache. Nothing here is committed."""
 
 import json
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -22,7 +23,16 @@ def main():
             print("have", dest.name)
             continue
         print("get", item["id"], url)
-        urllib.request.urlretrieve(url, dest)
+        # tsmc-2q25-zh currently answers with a Cloudflare challenge (HTTP 403,
+        # cf-mitigated: challenge) instead of the PDF. Leave the cache empty
+        # and keep going so one blocked deck does not stop the rest.
+        try:
+            urllib.request.urlretrieve(url, dest)
+        except urllib.error.HTTPError as exc:
+            if item["id"] == "tsmc-2q25-zh" and exc.code == 403:
+                print(" ", item["id"], "skipped: Cloudflare 403")
+                continue
+            raise
         print(" ", dest.stat().st_size, "bytes")
 
 

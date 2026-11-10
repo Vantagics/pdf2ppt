@@ -79,12 +79,15 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				StrokeB:     te.StrokeB,
 				StrokeWidth: te.StrokeWidth,
 				Tracking:    te.Tracking,
+				Clip:        te.Clip,
+				NoFill:      te.NoFill,
 			}
 			for _, r := range te.Runs {
 				tb.Runs = append(tb.Runs, goppt.TextRun{
 					Content: r.Content, FontName: r.FontName, FontSize: r.FontSize,
 					Bold: r.Bold, Italic: r.Italic,
 					ColorR: r.ColorR, ColorG: r.ColorG, ColorB: r.ColorB,
+					Baseline: r.Baseline,
 				})
 			}
 			if err := slide.AddTextBox(tb); err != nil {

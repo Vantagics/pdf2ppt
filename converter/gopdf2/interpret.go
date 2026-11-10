@@ -1158,6 +1158,20 @@ func subpathCount(ops []pathOp) int {
 	return n
 }
 
+func mostlyCJK(s string) bool {
+	n, cjk := 0, 0
+	for _, r := range s {
+		if r == ' ' {
+			continue
+		}
+		n++
+		if r >= 0x2E80 && r <= 0x9FFF {
+			cjk++
+		}
+	}
+	return n > 0 && cjk*2 >= n
+}
+
 func endsWithCJK(s string) bool {
 	if s == "" {
 		return false
@@ -1354,6 +1368,23 @@ func (ip *interp) showTJ(arr []token) {
 	for _, el := range arr {
 		switch el.kind {
 		case tkStr:
+			s0, adv0 := ip.decodeShow(el.raw)
+			if ip.gs.font != nil && ip.gs.font.t3 != nil && !mostlyCJK(s0) {
+				s, adv := s0, adv0
+				if text != "" {
+					ip.emitText(text, total)
+					text, total = "", 0
+				}
+				if !ip.paintType3(el.raw) {
+					ip.emitText(s, adv)
+					continue
+				}
+				ip.emitText(s, adv)
+				if n := len(ip.elements); n > 0 && ip.elements[n-1].Text != nil {
+					ip.elements[n-1].Text.NoFill = true
+				}
+				continue
+			}
 			s, adv := ip.decodeShow(el.raw)
 			// A large Tc (character spacing) is how PowerPoint spreads the
 			// parentheses of P=P+ρg(z−z) across the formula. One run would
@@ -1418,6 +1449,13 @@ func (ip *interp) showString(raw []byte, extra float64) {
 		return
 	}
 	s, adv := ip.decodeShow(raw)
+	if !mostlyCJK(s) && ip.paintType3(raw) {
+		ip.emitText(s, adv+extra)
+		if n := len(ip.elements); n > 0 && ip.elements[n-1].Text != nil {
+			ip.elements[n-1].Text.NoFill = true
+		}
+		return
+	}
 	ip.emitText(s, adv+extra)
 }
 
@@ -1559,6 +1597,11 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		Tracking:    tracking,
 	}
 	tb.ColorR, tb.ColorG, tb.ColorB = ip.gs.fill.bytes()
+	// Remember a symbolic font program. The lock is decided after lines merge,
+	// so a comma that joins a sentence is not turned into an outline.
+	if ip.gs.font != nil && ip.gs.font.symbolic && len(ip.gs.font.program) > 0 && utf8.RuneCountInString(text) == 1 {
+		tb.symbolProg = ip.gs.font.program
+	}
 	ip.seenContent = true
 	ip.elements = append(ip.elements, PageElement{Text: tb})
 	ip.advance(textAdv)

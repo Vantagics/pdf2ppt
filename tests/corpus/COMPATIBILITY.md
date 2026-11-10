@@ -1,5 +1,11 @@
 # Compatibility notes
 
+## v1.4.3
+
+Type 3 slide text is drawn from the glyph outlines (cesar2025-ai page 14). The characters stay in the text box without a fill. A subscript is a baseline-shifted run inside the same box; 2024 is not one. The psumac lock is the symbolic font's outline, not `$`. NBS logo JPEGs with a solid-white soft mask stay JPEG. A run that overlaps the next word is clipped back.
+
+`mit-ocw-ses1` is in the manifest. `fetch.py` notes the Cloudflare 403 on `tsmc-2q25-zh`.
+
 ## v1.4.2
 
 JPEG pictures stay JPEG. A clip is `a:srcRect` on a DCT image and a real crop on a PNG. A deck more than 10% larger than its v1.4.0 PPTX fails `TestPictureCountBaseline`. Local corpus total is 213 MB, down from 256 MB in v1.4.0.

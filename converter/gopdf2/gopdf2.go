@@ -64,6 +64,15 @@ type TextObject struct {
 	// Tracking is extra space between glyphs, in points. Negative tightens
 	// a fallback font so the run stays inside the PDF advance.
 	Tracking float64
+	// Clip stops the run from painting outside its box. Set when the PDF
+	// advance runs into the next word.
+	Clip bool
+	// NoFill keeps the characters in the file for recall but does not paint
+	// them. A Type3 outline is the visible glyph.
+	NoFill bool
+	// symbolProg is the embedded font for a one-character symbolic run.
+	// replaceIsolatedSymbols draws it when the run stays isolated.
+	symbolProg []byte
 	// Runs is set when several PDF runs on one line were merged into this
 	// box. Content is the concatenation. Empty means a single run.
 	Runs []TextRun
@@ -79,6 +88,9 @@ type TextRun struct {
 	ColorR   uint8
 	ColorG   uint8
 	ColorB   uint8
+	// Baseline is the DrawingML baseline shift in 1000ths of a percent.
+	// Negative drops a subscript (a typical subscript is -25000).
+	Baseline float64
 }
 
 // ImageObject is a raster image placed on the page.

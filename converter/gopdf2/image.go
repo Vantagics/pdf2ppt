@@ -48,6 +48,11 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 	}
 
 	smask, smW, smH, smDecode, matte := softMask(xrd, sd.Dict)
+	// A soft mask that is solid white does not clip the photo. Keeping it
+	// forces a JPEG logo (the NBS marks) through a PNG re-encode.
+	if smask != nil && !decodeInverts(smDecode, 1) && maskSolid(smask, 255) {
+		smask = nil
+	}
 	decode := decodeArray(xrd, sd.Dict)
 	invert := decodeInverts(decode, ncomp)
 	needPixels := smask != nil || opacity < 0.999 || invert || csName != "rgb" || bpc != 8
@@ -391,6 +396,18 @@ func flattenOn(data []byte, bgR, bgG, bgB byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func maskSolid(samples []byte, v byte) bool {
+	if len(samples) == 0 {
+		return false
+	}
+	for _, s := range samples {
+		if s != v {
+			return false
+		}
+	}
+	return true
 }
 
 func maskAlpha(samples []byte, w, h int, dec []float64, x, y, dstW, dstH int) byte {

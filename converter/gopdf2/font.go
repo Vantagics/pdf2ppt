@@ -66,6 +66,12 @@ type pdfFont struct {
 	enc      map[byte]string // WinAnsi, MacRoman, or an encoding dictionary
 	widths   map[int]float64 // glyph width in 1000ths of em, keyed by char code
 	defWidth float64
+	// symbolic is the PDF font flag. A subset icon font (the Keynote lock)
+	// sets it; body text does not.
+	symbolic bool
+	// program is the embedded FontFile2 (TrueType) or FontFile3 (CFF/OpenType).
+	program []byte
+	t3      *type3Font
 }
 
 func (f *pdfFont) decodeBytes(raw []byte, fontSize, charSp, wordSp, hScale float64) (string, float64) {
@@ -368,6 +374,9 @@ func parseFont(xrd *model.XRefTable, obj types.Object) *pdfFont {
 	if f.family == "" {
 		f.family = "Arial"
 	}
+	if st := d.NameEntry("Subtype"); st != nil && *st == "Type3" {
+		f.t3 = readType3(xrd, d)
+	}
 	return f
 }
 
@@ -390,12 +399,19 @@ func applyDescriptor(xrd *model.XRefTable, d types.Dict, f *pdfFont) {
 		f.defWidth = mw
 	}
 	if fl := intEntry(xrd, fd, "Flags"); fl != 0 {
+		// Bit 3 (value 4) is Symbolic. Body fonts set Nonsymbolic instead.
+		if fl&4 != 0 {
+			f.symbolic = true
+		}
 		if fl&(1<<6) != 0 {
 			f.italic = true
 		}
 		if fl&(1<<18) != 0 {
 			f.bold = true
 		}
+	}
+	if prog := fontProgram(xrd, fd); len(prog) > 0 {
+		f.program = prog
 	}
 	// TencentSansW7 carries FontWeight 700 and no "-Bold" in the name.
 	// Without this, "CORPORATE OVERVIEW" is drawn in regular Noto Sans.
@@ -412,6 +428,24 @@ func applyDescriptor(xrd *model.XRefTable, d types.Dict, f *pdfFont) {
 			}
 		}
 	}
+}
+
+func fontProgram(xrd *model.XRefTable, fd types.Dict) []byte {
+	for _, key := range []string{"FontFile2", "FontFile3", "FontFile"} {
+		o, ok := fd.Find(key)
+		if !ok || o == nil {
+			continue
+		}
+		sd, _, err := xrd.DereferenceStreamDict(o)
+		if err != nil || sd == nil {
+			continue
+		}
+		if err := sd.Decode(); err != nil || len(sd.Content) == 0 {
+			continue
+		}
+		return append([]byte(nil), sd.Content...)
+	}
+	return nil
 }
 
 func emRatio(v float64) float64 {

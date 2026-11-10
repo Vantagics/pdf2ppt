@@ -174,7 +174,11 @@ func formatTextBox(tb *TextBox, id int) string {
 	// the PDF advance. Padding it made neighboring columns collide.
 	sb.WriteString(fmt.Sprintf(`<p:spPr><a:xfrm%s><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, rot, tb.X, tb.Y, clampExtent(tb.Width), clampExtent(tb.Height)))
 	sb.WriteString(`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr>`)
-	sb.WriteString(`<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t" horzOverflow="overflow" vertOverflow="overflow"/>`)
+	overflow := "overflow"
+	if tb.Clip {
+		overflow = "clip"
+	}
+	sb.WriteString(fmt.Sprintf(`<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t" horzOverflow="%s" vertOverflow="overflow"/>`, overflow))
 	sb.WriteString(`<a:lstStyle/>`)
 	// 100% line spacing keeps the first baseline on the font's em box. The
 	// default (omitted) spacing adds external leading and drops the glyphs.
@@ -229,8 +233,19 @@ func formatTextRun(tb *TextBox, run TextRun) string {
 		line = fmt.Sprintf(`<a:ln w="%d" cap="rnd" cmpd="sng"><a:solidFill><a:srgbClr val="%02X%02X%02X"/></a:solidFill><a:prstDash val="solid"/><a:round/></a:ln>`, lw, tb.StrokeR, tb.StrokeG, tb.StrokeB)
 	}
 	fill := fmt.Sprintf(`<a:solidFill><a:srgbClr val="%02X%02X%02X"/></a:solidFill>`, run.ColorR, run.ColorG, run.ColorB)
-	if tb.StrokeOnly {
+	if tb.StrokeOnly || tb.NoFill {
 		fill = `<a:noFill/>`
+	}
+	base := ""
+	if math.Abs(run.Baseline) > 1 {
+		b := int(math.Round(run.Baseline))
+		if b < -100000 {
+			b = -100000
+		}
+		if b > 100000 {
+			b = 100000
+		}
+		base = fmt.Sprintf(` baseline="%d"`, b)
 	}
 	spc := ""
 	if math.Abs(run.Tracking) > 0.01 {
@@ -244,7 +259,7 @@ func formatTextRun(tb *TextBox, run TextRun) string {
 		spc = fmt.Sprintf(` spc="%d"`, sp)
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s"%s dirty="0">%s%s`, lang, fontSize, b, i, spc, line, fill))
+	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s"%s%s dirty="0">%s%s`, lang, fontSize, b, i, base, spc, line, fill))
 	if run.FontName != "" {
 		name := escapeXML(run.FontName)
 		sb.WriteString(fmt.Sprintf(`<a:latin typeface="%s"/><a:ea typeface="%s"/><a:cs typeface="%s"/>`, name, name, name))

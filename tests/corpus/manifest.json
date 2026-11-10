@@ -155,6 +155,15 @@
       "commit": false
     },
     {
+      "id": "mit-ocw-ses1",
+      "producer": "Microsoft PowerPoint",
+      "kind": "MIT OCW CMS.595 Spring 2024 session 1, Learning Media and Technology",
+      "url": "https://ocw.mit.edu/courses/cms-595-learning-media-and-technology-spring-2024/mitcms_595_s24_ses1.pdf",
+      "pages": 23,
+      "license": "MIT OpenCourseWare. Not committed; fetched by the script.",
+      "commit": false
+    },
+    {
       "id": "mit-datamgmt",
       "producer": "Microsoft PowerPoint 2010",
       "kind": "MIT data-management workshop",

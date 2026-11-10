@@ -109,19 +109,25 @@ func (p *PDFParser) ExtractPageContent(pageNum int) (*PageContent, error) {
 
 func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 	elem := TextElement{
-		Content:  textObj.Content,
-		ColorR:   textObj.ColorR,
-		ColorG:   textObj.ColorG,
-		ColorB:   textObj.ColorB,
-		Bold:     textObj.Bold,
-		Italic:   textObj.Italic,
-		X:        textObj.X,
-		Y:        textObj.Y,
-		Width:    textObj.Width,
-		Height:   textObj.Height,
-		Rotation: textObj.Rotation,
-		FontName: textObj.FontName,
-		FontSize: textObj.FontSize,
+		Content:     textObj.Content,
+		ColorR:      textObj.ColorR,
+		ColorG:      textObj.ColorG,
+		ColorB:      textObj.ColorB,
+		Bold:        textObj.Bold,
+		Italic:      textObj.Italic,
+		X:           textObj.X,
+		Y:           textObj.Y,
+		Width:       textObj.Width,
+		Height:      textObj.Height,
+		Rotation:    textObj.Rotation,
+		FontName:    textObj.FontName,
+		FontSize:    textObj.FontSize,
+		Stroke:      textObj.Stroke,
+		StrokeOnly:  textObj.StrokeOnly,
+		StrokeR:     textObj.StrokeR,
+		StrokeG:     textObj.StrokeG,
+		StrokeB:     textObj.StrokeB,
+		StrokeWidth: textObj.StrokeWidth,
 	}
 	if elem.FontName == "" {
 		elem.FontName = DefaultFontName

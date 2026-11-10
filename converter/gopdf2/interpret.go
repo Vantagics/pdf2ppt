@@ -57,12 +57,31 @@ type gstate struct {
 	lineWidth              float64
 	fillAlpha, strokeAlpha float64
 	fillGrad               *Gradient
+	fillTile               *tileFill
+	fillIsPat              bool // color space is a pattern we could not resolve
 	fontName               string
 	fontSize               float64
 	charSp, wordSp, hScale float64
 	leading, rise          float64
 	render                 int
 	font                   *pdfFont
+}
+
+// tileFill is a PatternType 1 cell whose content is one or more images.
+// PowerPoint exports a slide background this way: the cell is one photo,
+// the pattern matrix pins the cell origin to the top of the page, and the
+// tile that actually covers the page is the one below the origin.
+type tileFill struct {
+	base         matrix
+	pm           matrix
+	xStep, yStep float64
+	images       []patImage
+}
+
+type patImage struct {
+	res  *resources
+	name string
+	m    matrix
 }
 
 func defaultGS() gstate {
@@ -381,7 +400,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		gray := pop1(st)
 		ip.gs.fill = color3{gray, gray, gray}
 		ip.gs.fillN = 1
-		ip.gs.fillGrad = nil
+		ip.clearFillPattern()
 	case "G":
 		gray := pop1(st)
 		ip.gs.stroke = color3{gray, gray, gray}
@@ -390,7 +409,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		b, g, r := popN3(st)
 		ip.gs.fill = color3{r, g, b}
 		ip.gs.fillN = 3
-		ip.gs.fillGrad = nil
+		ip.clearFillPattern()
 	case "RG":
 		b, g, r := popN3(st)
 		ip.gs.stroke = color3{r, g, b}
@@ -399,6 +418,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		k, y, m, c := popN4(st)
 		ip.gs.fill = cmyk(c, m, y, k)
 		ip.gs.fillN = 4
+		ip.clearFillPattern()
 	case "K":
 		k, y, m, c := popN4(st)
 		ip.gs.stroke = cmyk(c, m, y, k)
@@ -406,6 +426,11 @@ func (ip *interp) exec(op string, st *[]token) {
 	case "cs":
 		name := popName(st)
 		ip.gs.fillN = csComponents(name)
+		ip.gs.fillIsPat = name == "Pattern"
+		if ip.gs.fillIsPat {
+			ip.gs.fillGrad = nil
+			ip.gs.fillTile = nil
+		}
 	case "CS":
 		name := popName(st)
 		ip.gs.strokeN = csComponents(name)
@@ -413,7 +438,18 @@ func (ip *interp) exec(op string, st *[]token) {
 		ip.popColor(st, ip.gs.fillN, true)
 	case "scn":
 		if len(*st) > 0 && (*st)[len(*st)-1].kind == tkName {
-			ip.gs.fillGrad = ip.res.axialPattern(popName(st), ip.baseCTM)
+			name := popName(st)
+			ip.gs.fillGrad = nil
+			ip.gs.fillTile = nil
+			if g := ip.res.axialPattern(name, ip.baseCTM); g != nil {
+				ip.gs.fillGrad = g
+				ip.gs.fillIsPat = false
+			} else if t := ip.res.tilingPattern(name, ip.baseCTM); t != nil {
+				ip.gs.fillTile = t
+				ip.gs.fillIsPat = false
+			} else {
+				ip.gs.fillIsPat = true
+			}
 		} else {
 			ip.popColor(st, ip.gs.fillN, true)
 		}
@@ -583,9 +619,16 @@ func (ip *interp) popColor(st *[]token, n int, fill bool) {
 	}
 	if fill {
 		ip.gs.fill = c
+		ip.clearFillPattern()
 	} else {
 		ip.gs.stroke = c
 	}
+}
+
+func (ip *interp) clearFillPattern() {
+	ip.gs.fillGrad = nil
+	ip.gs.fillTile = nil
+	ip.gs.fillIsPat = false
 }
 
 func (ip *interp) moveTo(x, y float64) {
@@ -643,6 +686,20 @@ func (ip *interp) paint(fill, stroke, evenOdd bool) {
 	minX, minY, maxX, maxY, ok := pathBounds(ops)
 	if !ok {
 		return
+	}
+	if fill && ip.gs.fillTile != nil {
+		ip.emitTile(minX, minY, maxX, maxY)
+		fill = false
+		if !stroke {
+			return
+		}
+	}
+	// An unresolved pattern must not fall back to the default black fill.
+	if fill && ip.gs.fillIsPat {
+		fill = false
+		if !stroke {
+			return
+		}
 	}
 	if fill && ip.gs.fillGrad != nil && !ip.seenContent && ip.coversPage(minX, minY, maxX, maxY) && !hasCurve(ops) {
 		ip.hasBg = true
@@ -928,8 +985,23 @@ func (ip *interp) emitText(text string, textAdv float64) {
 			family = ip.gs.font.family
 		}
 	}
-	if ip.gs.render == 2 {
-		bold = true
+	if mapped, fam, ok := rewriteWingdings(family, text); ok {
+		text = mapped
+		family = fam
+	}
+	stroke := ip.gs.render == 1 || ip.gs.render == 2 || ip.gs.render == 5 || ip.gs.render == 6
+	strokeOnly := ip.gs.render == 1 || ip.gs.render == 5
+	sw := 0.0
+	var sr, sg, sb uint8
+	if stroke {
+		sx := math.Hypot(ip.gs.ctm[0], ip.gs.ctm[1])
+		sy := math.Hypot(ip.gs.ctm[2], ip.gs.ctm[3])
+		scale := (sx + sy) / 2
+		if scale == 0 {
+			scale = 1
+		}
+		sw = ip.gs.lineWidth * scale
+		sr, sg, sb = ip.gs.stroke.bytes()
 	}
 	bx, by := ip.gs.ctm.apply(ip.tm[4], ip.tm[5])
 	// Rise is in unscaled text space.
@@ -976,16 +1048,22 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		yTop = cy - height/2
 	}
 	tb := &TextObject{
-		Content:  text,
-		FontName: family,
-		FontSize: eff,
-		Bold:     bold,
-		Italic:   italic,
-		X:        xLeft,
-		Y:        yTop,
-		Width:    width,
-		Height:   height,
-		Rotation: rot,
+		Content:     text,
+		FontName:    family,
+		FontSize:    eff,
+		Bold:        bold,
+		Italic:      italic,
+		X:           xLeft,
+		Y:           yTop,
+		Width:       width,
+		Height:      height,
+		Rotation:    rot,
+		Stroke:      stroke && sw > 0.05,
+		StrokeOnly:  strokeOnly,
+		StrokeR:     sr,
+		StrokeG:     sg,
+		StrokeB:     sb,
+		StrokeWidth: sw,
 	}
 	tb.ColorR, tb.ColorG, tb.ColorB = ip.gs.fill.bytes()
 	ip.seenContent = true
@@ -993,8 +1071,311 @@ func (ip *interp) emitText(text string, textAdv float64) {
 	ip.advance(textAdv)
 }
 
-// textRotation returns clockwise degrees for DrawingML. PDF's text matrix
-// angle is counterclockwise in a y-up space, which is the opposite direction.
+func (r *resources) tilingPattern(name string, base matrix) *tileFill {
+	d, sd := r.patternDict(name)
+	if d == nil || intEntry(r.xrd, d, "PatternType") != 1 || sd == nil {
+		return nil
+	}
+	if err := sd.Decode(); err != nil || len(sd.Content) == 0 {
+		return nil
+	}
+	placed := patternImagePlacements(sd.Content)
+	if len(placed) == 0 {
+		return nil
+	}
+	res := r
+	if o, ok := sd.Find("Resources"); ok {
+		if rd, err := r.xrd.DereferenceDict(o); err == nil && rd != nil {
+			res = newResources(r.xrd, rd, r)
+		}
+	}
+	pm := ident()
+	if m := readMatrix(r.xrd, d.ArrayEntry("Matrix")); m != nil {
+		pm = *m
+	}
+	xs := numEntry(r.xrd, d, "XStep")
+	ys := numEntry(r.xrd, d, "YStep")
+	if bb := d.ArrayEntry("BBox"); len(bb) == 4 {
+		x0, ok0 := objNum(r.xrd, bb[0])
+		y0, ok1 := objNum(r.xrd, bb[1])
+		x1, ok2 := objNum(r.xrd, bb[2])
+		y1, ok3 := objNum(r.xrd, bb[3])
+		if ok0 && ok1 && ok2 && ok3 {
+			if xs == 0 {
+				xs = x1 - x0
+			}
+			if ys == 0 {
+				ys = y1 - y0
+			}
+		}
+	}
+	tf := &tileFill{base: base, pm: pm, xStep: xs, yStep: ys}
+	for _, p := range placed {
+		tf.images = append(tf.images, patImage{res: res, name: p.name, m: p.m})
+	}
+	return tf
+}
+
+type placedPatImage struct {
+	name string
+	m    matrix
+}
+
+// patternImagePlacements walks a tiling-pattern content stream and records
+// each image Do with the CTM in effect in pattern space.
+func patternImagePlacements(content []byte) []placedPatImage {
+	toks := tokenize(content)
+	var st []token
+	ctm := ident()
+	var saved []matrix
+	var out []placedPatImage
+	for _, t := range toks {
+		if t.kind != tkOp {
+			st = append(st, t)
+			continue
+		}
+		switch t.text {
+		case "q":
+			saved = append(saved, ctm)
+			st = nil
+		case "Q":
+			if n := len(saved); n > 0 {
+				ctm = saved[n-1]
+				saved = saved[:n-1]
+			}
+			st = nil
+		case "cm":
+			if len(st) >= 6 {
+				nums := make([]float64, 6)
+				okm := true
+				for i := 0; i < 6; i++ {
+					if st[len(st)-6+i].kind != tkNum {
+						okm = false
+						break
+					}
+					nums[i] = st[len(st)-6+i].num
+				}
+				if okm {
+					ctm = concat(matrix{nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]}, ctm)
+				}
+			}
+			st = nil
+		case "Do":
+			if len(st) > 0 && st[len(st)-1].kind == tkName {
+				out = append(out, placedPatImage{name: st[len(st)-1].text, m: ctm})
+			}
+			st = nil
+		default:
+			st = nil
+		}
+	}
+	return out
+}
+
+func (r *resources) patternDict(name string) (types.Dict, *types.StreamDict) {
+	if r == nil || name == "" {
+		return nil, nil
+	}
+	pd := r.sub("Pattern")
+	if pd == nil {
+		if r.parent != nil {
+			return r.parent.patternDict(name)
+		}
+		return nil, nil
+	}
+	o, ok := pd.Find(name)
+	if !ok {
+		if r.parent != nil {
+			return r.parent.patternDict(name)
+		}
+		return nil, nil
+	}
+	sd, _, err := r.xrd.DereferenceStreamDict(o)
+	if err == nil && sd != nil {
+		return sd.Dict, sd
+	}
+	d, err := r.xrd.DereferenceDict(o)
+	if err != nil {
+		return nil, nil
+	}
+	return d, nil
+}
+
+func readMatrix(xrd *model.XRefTable, m types.Array) *matrix {
+	if len(m) != 6 {
+		return nil
+	}
+	var mm [6]float64
+	for i := 0; i < 6; i++ {
+		n, ok := objNum(xrd, m[i])
+		if !ok {
+			return nil
+		}
+		mm[i] = n
+	}
+	out := matrix{mm[0], mm[1], mm[2], mm[3], mm[4], mm[5]}
+	return &out
+}
+
+func invertMatrix(m matrix) (matrix, bool) {
+	det := m[0]*m[3] - m[1]*m[2]
+	if math.Abs(det) < 1e-12 {
+		return ident(), false
+	}
+	inv := 1 / det
+	a, b, c, d, e, f := m[0], m[1], m[2], m[3], m[4], m[5]
+	return matrix{
+		d * inv, -b * inv, -c * inv, a * inv,
+		(c*f - d*e) * inv,
+		(b*e - a*f) * inv,
+	}, true
+}
+
+func (ip *interp) emitTile(minX, minY, maxX, maxY float64) {
+	t := ip.gs.fillTile
+	if t == nil {
+		return
+	}
+	// User = base × patternMatrix × patternPoint (pattern matrix first).
+	toPat, ok := invertMatrix(concat(t.pm, t.base))
+	if !ok {
+		return
+	}
+	px0, py0, px1, py1 := userBoundsToPattern(toPat, minX, minY, maxX, maxY)
+	for _, im := range t.images {
+		ix0, iy0, ix1, iy1 := matrixBounds(im.m)
+		xs, ys := t.xStep, t.yStep
+		if xs < 0.5 {
+			xs = ix1 - ix0
+		}
+		if ys < 0.5 {
+			ys = iy1 - iy0
+		}
+		if xs < 0.5 || ys < 0.5 {
+			continue
+		}
+		xi0 := int(math.Floor((px0-ix1)/xs)) - 1
+		xi1 := int(math.Ceil((px1-ix0)/xs)) + 1
+		yi0 := int(math.Floor((py0-iy1)/ys)) - 1
+		yi1 := int(math.Ceil((py1-iy0)/ys)) + 1
+		if xi1-xi0 > 6 {
+			xi0, xi1 = -1, 1
+		}
+		if yi1-yi0 > 6 {
+			yi0, yi1 = -2, 1
+		}
+		for xi := xi0; xi <= xi1; xi++ {
+			for yi := yi0; yi <= yi1; yi++ {
+				tr := matrix{1, 0, 0, 1, float64(xi) * xs, float64(yi) * ys}
+				// Apply image CTM, then the tile offset, then pattern matrix, then base.
+				user := concat(im.m, concat(tr, concat(t.pm, t.base)))
+				ub0, vb0, ub1, vb1 := matrixBounds(user)
+				if ub1 < minX-1 || ub0 > maxX+1 || vb1 < minY-1 || vb0 > maxY+1 {
+					continue
+				}
+				savedCTM := ip.gs.ctm
+				savedRes := ip.res
+				ip.gs.ctm = user
+				ip.res = im.res
+				if xo := im.res.xobject(im.name); xo != nil && xo.kind == "image" {
+					ip.paintImage(xo)
+					ip.clipLastImage(minX, minY, maxX, maxY)
+				}
+				ip.gs.ctm = savedCTM
+				ip.res = savedRes
+			}
+		}
+	}
+}
+
+func userBoundsToPattern(toPat matrix, minX, minY, maxX, maxY float64) (x0, y0, x1, y1 float64) {
+	pts := [][2]float64{{minX, minY}, {maxX, minY}, {minX, maxY}, {maxX, maxY}}
+	x0, y0 = math.MaxFloat64, math.MaxFloat64
+	x1, y1 = -math.MaxFloat64, -math.MaxFloat64
+	for _, p := range pts {
+		x, y := toPat.apply(p[0], p[1])
+		if x < x0 {
+			x0 = x
+		}
+		if y < y0 {
+			y0 = y
+		}
+		if x > x1 {
+			x1 = x
+		}
+		if y > y1 {
+			y1 = y
+		}
+	}
+	return
+}
+
+func matrixBounds(m matrix) (minX, minY, maxX, maxY float64) {
+	pts := [][2]float64{{0, 0}, {1, 0}, {0, 1}, {1, 1}}
+	minX, minY = math.MaxFloat64, math.MaxFloat64
+	maxX, maxY = -math.MaxFloat64, -math.MaxFloat64
+	for _, p := range pts {
+		x, y := m.apply(p[0], p[1])
+		if x < minX {
+			minX = x
+		}
+		if y < minY {
+			minY = y
+		}
+		if x > maxX {
+			maxX = x
+		}
+		if y > maxY {
+			maxY = y
+		}
+	}
+	return
+}
+
+func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64) {
+	if len(ip.elements) == 0 {
+		return
+	}
+	el := &ip.elements[len(ip.elements)-1]
+	img := el.Image
+	if img == nil {
+		return
+	}
+	imgMinX := img.X + ip.originX
+	imgMaxX := imgMinX + img.Width
+	imgMaxY := (ip.originY + ip.pageH) - img.Y
+	imgMinY := imgMaxY - img.Height
+	cx0 := math.Max(minX, imgMinX)
+	cy0 := math.Max(minY, imgMinY)
+	cx1 := math.Min(maxX, imgMaxX)
+	cy1 := math.Min(maxY, imgMaxY)
+	if cx1-cx0 < 0.5 || cy1-cy0 < 0.5 {
+		ip.elements = ip.elements[:len(ip.elements)-1]
+		return
+	}
+	if cx0-imgMinX < 1.5 && imgMaxX-cx1 < 1.5 && cy0-imgMinY < 1.5 && imgMaxY-cy1 < 1.5 {
+		return
+	}
+	// Only axis-aligned placements can be cropped by a rectangle.
+	if img.Width < 0.5 || img.Height < 0.5 {
+		return
+	}
+	left := (cx0 - imgMinX) / img.Width
+	right := (imgMaxX - cx1) / img.Width
+	top := (imgMaxY - cy1) / img.Height
+	bottom := (cy0 - imgMinY) / img.Height
+	cropped, format, err := cropEncodedImage(img.Data, left, top, right, bottom)
+	if err != nil || len(cropped) == 0 {
+		return
+	}
+	img.Data = cropped
+	img.Format = format
+	img.X = cx0 - ip.originX
+	img.Y = (ip.originY + ip.pageH) - cy1
+	img.Width = cx1 - cx0
+	img.Height = cy1 - cy0
+}
+
 func (r *resources) axialPattern(name string, ctm matrix) *Gradient {
 	if r == nil || name == "" {
 		return nil

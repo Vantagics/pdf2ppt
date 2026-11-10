@@ -163,7 +163,18 @@ func formatTextBox(tb *TextBox, id int) string {
 	// 100% line spacing keeps the first baseline on the font's em box. The
 	// default (omitted) spacing adds external leading and drops the glyphs.
 	sb.WriteString(`<a:p><a:pPr marL="0" indent="0"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:buNone/></a:pPr>`)
-	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s" dirty="0"><a:solidFill><a:srgbClr val="%s"/></a:solidFill>`, lang, fontSize, b, i, colorHex))
+	fill := fmt.Sprintf(`<a:solidFill><a:srgbClr val="%s"/></a:solidFill>`, colorHex)
+	if tb.StrokeOnly {
+		fill = `<a:noFill/>`
+	}
+	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s" dirty="0">%s`, lang, fontSize, b, i, fill))
+	if tb.Stroke && tb.StrokeWidth > 0.05 {
+		w := int(math.Round(tb.StrokeWidth * 12700))
+		if w < 635 {
+			w = 635
+		}
+		sb.WriteString(fmt.Sprintf(`<a:ln w="%d" cap="rnd" cmpd="sng"><a:solidFill><a:srgbClr val="%02X%02X%02X"/></a:solidFill><a:prstDash val="solid"/><a:round/></a:ln>`, w, tb.StrokeR, tb.StrokeG, tb.StrokeB))
+	}
 	if tb.FontName != "" {
 		name := escapeXML(tb.FontName)
 		sb.WriteString(fmt.Sprintf(`<a:latin typeface="%s"/><a:ea typeface="%s"/><a:cs typeface="%s"/>`, name, name, name))

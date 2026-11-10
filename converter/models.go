@@ -23,19 +23,25 @@ const (
 
 // TextElement 从 PDF 页面中提取的文本元素
 type TextElement struct {
-	Content  string  `json:"content"`
-	FontName string  `json:"fontName"`
-	FontSize float64 `json:"fontSize"`
-	ColorR   uint8   `json:"colorR"`
-	ColorG   uint8   `json:"colorG"`
-	ColorB   uint8   `json:"colorB"`
-	Bold     bool    `json:"bold"`
-	Italic   bool    `json:"italic"`
-	X        float64 `json:"x"`
-	Y        float64 `json:"y"`
-	Width    float64 `json:"width"`
-	Height   float64 `json:"height"`
-	Rotation float64 `json:"rotation,omitempty"`
+	Content     string  `json:"content"`
+	FontName    string  `json:"fontName"`
+	FontSize    float64 `json:"fontSize"`
+	ColorR      uint8   `json:"colorR"`
+	ColorG      uint8   `json:"colorG"`
+	ColorB      uint8   `json:"colorB"`
+	Bold        bool    `json:"bold"`
+	Italic      bool    `json:"italic"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Width       float64 `json:"width"`
+	Height      float64 `json:"height"`
+	Rotation    float64 `json:"rotation,omitempty"`
+	Stroke      bool    `json:"stroke,omitempty"`
+	StrokeOnly  bool    `json:"strokeOnly,omitempty"`
+	StrokeR     uint8   `json:"strokeR,omitempty"`
+	StrokeG     uint8   `json:"strokeG,omitempty"`
+	StrokeB     uint8   `json:"strokeB,omitempty"`
+	StrokeWidth float64 `json:"strokeWidth,omitempty"`
 }
 
 // PathOp is one command of a vector outline. Coordinates are in points,

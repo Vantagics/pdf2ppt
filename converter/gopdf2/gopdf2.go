@@ -55,6 +55,12 @@ type TextObject struct {
 	Width    float64
 	Height   float64
 	Rotation float64 // clockwise degrees, matching DrawingML
+	// Stroke is set for PDF text rendering modes that outline the glyphs
+	// (modes 1, 2, 5, and 6). StrokeOnly is mode 1 or 5 (no fill).
+	Stroke                    bool
+	StrokeOnly                bool
+	StrokeR, StrokeG, StrokeB uint8
+	StrokeWidth               float64
 }
 
 // ImageObject is a raster image placed on the page.

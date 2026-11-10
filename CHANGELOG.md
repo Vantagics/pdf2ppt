@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0
+
+PowerPoint often saves a slide background as a tiling pattern whose cell is one photo, with the pattern origin at the top of the page. The tile that covers the page is the one just below that origin. Unresolved pattern fills were painted with the default black, so a Chinese PowerPoint 2013 title (a building photo plus a gold title) came back as a black page. Those single-image tiles are now placed on the slide, clipped to the filled path.
+
+Wingdings runs whose ToUnicode map uses the private-use area (U+F0E0 and the rest of U+F020–U+F0FF) are rewritten to Unicode, and the font is set to DejaVu Sans so the arrow draws without Wingdings installed. Text rendering mode 2 (fill and stroke) is an outline on the run, not a fake bold flag.
+
+Measured at 60 dpi, first pages plus a middle page, source PDF render against the LibreOffice render of the PPTX. Character recall is the share of source characters present in the PPTX text. The other decks did not move; the gain is the PowerPoint 2013 deck.
+
+| Deck | Producer | Mean SSIM before | Mean SSIM after | Text recall after |
+| --- | --- | ---: | ---: | ---: |
+| gzmtu courseware (zh) | PowerPoint 2013 | 0.300 (worst page 0.025) | 0.784 (worst page 0.684) | 1.00 |
+| eight other slide PDFs | PowerPoint 2016/365, Keynote, Google, Beamer, Distiller | 0.921 | 0.921 | 0.99–1.00 |
+
+Per-deck notes are in `tests/corpus/COMPATIBILITY.md`.
+
 ## 1.1.1
 
 The Chrome/Skia slide gradient was mirrored top to bottom. The shading axis was transformed by both the pattern matrix and the paint-time CTM. Poppler applies the pattern matrix in the content stream's base space and cancels the CTM, so the extra multiply flipped the axis: yellow climbed into the top-right and the navy region shrank. Stop positions and the −18° label geometry were already right; the flipped background made the label look shifted. The white chip's centroid now matches the source within a fraction of a pixel.

@@ -59,19 +59,25 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 		case el.Text != nil:
 			te := el.Text
 			tb := &goppt.TextBox{
-				Content:  te.Content,
-				FontName: te.FontName,
-				FontSize: te.FontSize,
-				ColorR:   te.ColorR,
-				ColorG:   te.ColorG,
-				ColorB:   te.ColorB,
-				Bold:     te.Bold,
-				Italic:   te.Italic,
-				X:        PointsToEMU(te.X),
-				Y:        PointsToEMU(te.Y),
-				Width:    PointsToEMU(te.Width),
-				Height:   PointsToEMU(te.Height),
-				Rotation: te.Rotation,
+				Content:     te.Content,
+				FontName:    te.FontName,
+				FontSize:    te.FontSize,
+				ColorR:      te.ColorR,
+				ColorG:      te.ColorG,
+				ColorB:      te.ColorB,
+				Bold:        te.Bold,
+				Italic:      te.Italic,
+				X:           PointsToEMU(te.X),
+				Y:           PointsToEMU(te.Y),
+				Width:       PointsToEMU(te.Width),
+				Height:      PointsToEMU(te.Height),
+				Rotation:    te.Rotation,
+				Stroke:      te.Stroke,
+				StrokeOnly:  te.StrokeOnly,
+				StrokeR:     te.StrokeR,
+				StrokeG:     te.StrokeG,
+				StrokeB:     te.StrokeB,
+				StrokeWidth: te.StrokeWidth,
 			}
 			if err := slide.AddTextBox(tb); err != nil {
 				log.Printf("warning: failed to add text box %d: %v", i, err)

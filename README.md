@@ -69,17 +69,17 @@ python3 tests/corpus/fetch.py
 go test ./converter -run 'TestRoundTrip|TestChromeSkiaSlide' -count=1 -timeout 20m
 ```
 
-On the decks that were checked, PowerPoint and Keynote pages keep their pictures and layout. Accented text (Catalan à è é í ó) needed WinAnsi, which PowerPoint uses when there is no ToUnicode map. Chrome/Skia gradients are axial shadings; rotated text is a real rotated text box. No redistributable WPS-exported deck was found.
+On the decks that were checked, PowerPoint and Keynote pages keep their pictures and layout. Accented text (Catalan à è é í ó) needed WinAnsi, which PowerPoint uses when there is no ToUnicode map. Chrome/Skia gradients are axial shadings; rotated text is a real rotated text box. PowerPoint 2013 often stores the slide background as a one-image tiling pattern; that photo is placed on the slide instead of a black page. Wingdings private-use arrows become Unicode arrows. `tests/corpus/COMPATIBILITY.md` has the per-deck SSIM table. No redistributable WPS Presentation export was found.
 
 ## Known limitations
 
-- **One slide size per file.** OOXML stores a single `sldSz`. Every page is placed using its own box, but the presentation size follows the first page.
+- **One slide size per file.** OOXML stores a single `sldSz`. The presentation size is the largest page, so a later larger page is not clipped. A smaller page keeps its own box and sits in the corner of that canvas.
 - **Text is one box per PDF text run.** A wrapped paragraph or a mixed Latin/Chinese line usually comes back as several boxes on the same baseline, not as the original single text frame. The characters and their positions are preserved.
 - **Tables and bullets are not native PowerPoint objects.** A table comes back as cell rectangles plus text boxes. A bullet list comes back as a bullet character and a text box per line. Both stay editable.
 - **Preset shapes are outlines.** Rectangles stay rectangles. Ovals, rounded rectangles, diamonds, and arbitrary curves become freeform geometry that matches the PDF path. Drop shadows that LibreOffice rasterizes are kept as images.
-- **Baseline placement assumes an unrotated, horizontal run.** The box is positioned so LibreOffice draws the baseline on the PDF baseline. Rotated or vertical text is not reconstructed as rotated text.
+- **Baseline placement assumes a horizontal run.** The box is positioned so LibreOffice draws the baseline on the PDF baseline. Rotated text is a rotated text box. Vertical writing mode is not reconstructed.
 - **Fonts have to be installed to look the same.** The file records the family name; it does not embed the font. A missing family is substituted by the viewer.
-- **Not every PDF construct is modeled.** Shadings, patterns, Type 3 fonts, optional content, annotations, and encrypted files are skipped or rejected. Inline images are not read.
+- **Not every PDF construct is modeled.** Axial and radial shadings become gradient fills, and a tiling pattern that is a single image (a common PowerPoint background) is placed as that image. Other tiling patterns, Type 3 fonts, optional content, annotations, and files that need a user password are still skipped or rejected. Inline images are not read.
 
 ## Layout
 

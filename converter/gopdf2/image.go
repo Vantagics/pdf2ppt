@@ -87,6 +87,45 @@ func isJPEG(b []byte) bool {
 	return len(b) > 3 && b[0] == 0xFF && b[1] == 0xD8
 }
 
+// cropEncodedImage trims an encoded image by fractions of its width and height
+// measured from each edge. left/right/top/bottom are 0..1. Top is the first
+// row of the bitmap.
+func cropEncodedImage(data []byte, left, top, right, bottom float64) ([]byte, string, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", err
+	}
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	x0 := b.Min.X + int(math.Round(left*float64(w)))
+	x1 := b.Max.X - int(math.Round(right*float64(w)))
+	y0 := b.Min.Y + int(math.Round(top*float64(h)))
+	y1 := b.Max.Y - int(math.Round(bottom*float64(h)))
+	if x1-x0 < 1 || y1-y0 < 1 {
+		return nil, "", nil
+	}
+	type subImager interface {
+		SubImage(r image.Rectangle) image.Image
+	}
+	var cropped image.Image
+	if s, ok := img.(subImager); ok {
+		cropped = s.SubImage(image.Rect(x0, y0, x1, y1))
+	} else {
+		dst := image.NewNRGBA(image.Rect(0, 0, x1-x0, y1-y0))
+		for y := y0; y < y1; y++ {
+			for x := x0; x < x1; x++ {
+				dst.Set(x-x0, y-y0, img.At(x, y))
+			}
+		}
+		cropped = dst
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, cropped); err != nil {
+		return nil, "", err
+	}
+	return buf.Bytes(), "png", nil
+}
+
 func colorInfo(xrd *model.XRefTable, d types.Dict) (name string, n int) {
 	o, ok := d.Find("ColorSpace")
 	if !ok || o == nil {

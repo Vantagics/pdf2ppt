@@ -1,5 +1,5 @@
 {
-  "note": "Only files we are allowed to redistribute are stored in the repo. Everything else is downloaded into tests/corpus/cache by fetch.py and is not committed.",
+  "note": "Only files we are allowed to redistribute are stored in the repo. Everything else is downloaded into tests/corpus/cache by fetch.py and is not committed. Scores for v1.2.0 are in COMPATIBILITY.md.",
   "files": [
     {
       "id": "uab-isc2-2016",
@@ -20,12 +20,66 @@
       "commit": false
     },
     {
+      "id": "cdc-nbs-m365",
+      "producer": "Microsoft PowerPoint for Microsoft 365",
+      "kind": "US CDC newborn screening overview (widescreen)",
+      "url": "https://reach.cdc.gov/sites/default/files/2024-07/508-NBS_Full%20Slide%20Deck-7.25.24.pdf",
+      "pages": 52,
+      "license": "US government work. Not committed; the file is several megabytes and the corpus stays manifest-only.",
+      "commit": false
+    },
+    {
+      "id": "gzmtu-ppt-2013",
+      "producer": "Microsoft PowerPoint 2013",
+      "kind": "Chinese university courseware (PPT教学课件制作与演示技巧)",
+      "url": "https://netc.gzmtu.edu.cn/__local/0/21/61/13754184E4F0E884D7604A35B2F_81EB39E0_3A7073.pdf",
+      "pages": 24,
+      "license": "Guangzhou Maritime University courseware. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "nrcs-cattle-distiller",
+      "producer": "Acrobat Distiller 24.0 (Windows); title names Microsoft PowerPoint",
+      "kind": "letter-size print of a PowerPoint deck, not a 16:9 export",
+      "url": "https://www.nrcs.usda.gov/sites/default/files/2025-01/250113-NV-NRCS-2025-UNR-Cattlemens-Update.pdf",
+      "pages": 22,
+      "license": "USDA NRCS public website. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "macadmins-autopkg-google",
+      "producer": "Creator: Google (Google Slides download; PDF has no Producer string)",
+      "kind": "MacAdmins conference talk",
+      "url": "https://github.com/jgstew/MacAdmins2023/raw/main/Using%20AutoPkg%20for%20Windows%20Software%202.0%20-%20Slides.pdf",
+      "pages": 47,
+      "license": "Speaker's conference slides on GitHub. Not committed.",
+      "commit": false
+    },
+    {
       "id": "psumac-keynote",
       "producer": "Keynote (macOS Quartz PDFContext)",
       "kind": "conference talk",
       "url": "https://bpb-us-e1.wpmucdn.com/sites.psu.edu/dist/4/24696/files/2023/07/psumac2023-DYQWYU-Scripting-the-unscriptable-GUI-Scripts-in-macOS.pdf",
       "pages": 91,
       "license": "Penn State MacAdmins 2023 talk by Ross Matsuda. All rights reserved by the speaker; not committed.",
+      "commit": false
+    },
+    {
+      "id": "beamer-flip",
+      "producer": "LaTeX with Beamer class 3.10, xdvipdfmx 0.7.8",
+      "kind": "beamer theme demo",
+      "url": "https://github.com/fliptanedo/FlipBeamerTheme/raw/master/FlipBeamerTemplate.pdf",
+      "pages": 33,
+      "license": "Theme demo distributed from the theme repository. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "beamer-mcgill",
+      "producer": "LaTeX with Beamer class 3.24, pdfTeX 1.40.12",
+      "kind": "beamer theme demo",
+      "url": "https://github.com/gsarkis/McGill-Beamer-Theme/raw/master/example.pdf",
+      "pages": 3,
+      "license": "Theme example distributed from the theme repository. Not committed.",
       "commit": false
     },
     {

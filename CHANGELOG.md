@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.5
+
+v1.4.4 gave every contour of a custom geometry its own `a:path`. PowerPoint fills each `a:path` by itself, so a second contour that was a hole was painted solid. That filled the WPS title frame (`#262626` over the card; page 1 SSIM 0.970 to 0.577), the WPS page 2 and page 4 rings, the Mahidol wordmark counters, the Beijing triangle, the McGill crest, and the Keynote lock. Every contour of one fill is one `a:path` again. An even-odd hole that winds the same way as the shape around it is reversed, so `fill="norm"` (nonzero) punches the same hole. The 0.15 pt grid snap and the Type 3 line merge stay; they do not split the path.
+
+A logo JPEG of 400 px or less is stored as JPEG again. The PNG re-encode did not move nbs page 4 (SSIM 0.8472 to 0.8469) and grew mit-ocw-ses1 by 30.5% and mit-datamgmt by 14.4%. The 10% size gate did not fail that release. `pptx_size_baseline_v140.json` was recorded from the v1.4.0 local corpus and has no entry for those two decks, `corpusPDF` only opens a file it finds under `/tmp/corpus`, and the GitHub job checks out no corpus PDFs, so `TestPictureCountBaseline` skips.
+
+`TestHoleStaysOnePath` requires a frame, a letter O, and a donut to emit a single `a:path` containing both contours. `TestRenderedSlidesMatchBaseline` renders wps pages 1, 2, and 4, canva-mahidol page 1, bjedu-2026 page 1, beamer-mcgill page 1, and psumac page 30 with LibreOffice and compares them to the stored PNGs. `TestHoleRendersOpen` renders those three holes and fails when the center is the fill. LibreOffice paints the split path solid too: the v1.4.4 WPS page 1 is mean error 96 against this render.
+
 ## 1.4.4
 
 An outlined symbol keeps its character in the text box with no fill, so `a:t` still contains the bullet, `$`, `#`, `%`, `(`, and `@` that v1.4.3 dropped. A common punctuation mark or a bullet is outlined only when the embedded font has a handful of glyphs (the Keynote lock). A bullet in a normal text face stays real text. `TestPictureCountBaseline` fails if concatenated `a:t` tokens fall more than 0.3% under the stored v1.4.2 counts.

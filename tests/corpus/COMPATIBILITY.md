@@ -1,5 +1,11 @@
 # Compatibility notes
 
+## v1.4.5
+
+A fill with a hole is one `a:path`. PowerPoint fills each `a:path` separately, which is why v1.4.4 painted the WPS frame, the lock, the wordmark counters, the Beijing triangle, and the McGill crest solid. An even-odd hole that winds with the outer contour is reversed so nonzero fill matches. Logo JPEGs stay JPEG, including ones at most 400 px wide.
+
+`TestHoleStaysOnePath` and `TestHoleRendersOpen` cover a frame, a letter O, and a donut. `TestRenderedSlidesMatchBaseline` compares LibreOffice renders of wps pages 1, 2, and 4, canva-mahidol page 1, bjedu-2026 page 1, beamer-mcgill page 1, and psumac page 30 with the stored PNGs.
+
 ## v1.4.4
 
 Outlined symbols stay in `a:t` with no fill. Common punctuation and bullets are outlined only for a tiny symbolic font, so a body-font bullet stays text. Concatenated `a:t` tokens may not fall more than 0.3% under the v1.4.2 counts.

@@ -51,6 +51,107 @@ func TestSubscriptBaseline(t *testing.T) {
 	}
 }
 
+func TestHoleStaysOnePath(t *testing.T) {
+	// DrawingML fills each a:path on its own. A frame, a letter O, and a
+	// donut only stay open when both contours share one a:path, and an
+	// even-odd hole that winds with the outer contour is reversed so
+	// fill="norm" punches it.
+	frameOuter := rectContour(0, 0, 1000, 1000)
+	frameHole := rectContour(250, 250, 750, 750)
+	t.Run("frame", func(t *testing.T) {
+		xml := holeGeom(true, frameOuter, frameHole)
+		assertOnePath(t, xml, 2)
+		if !strings.Contains(xml, `<a:moveTo><a:pt x="250" y="750"/></a:moveTo>`) {
+			t.Fatalf("same-direction hole was not reversed:\n%s", xml)
+		}
+	})
+	t.Run("frame-opposite-winding", func(t *testing.T) {
+		// Already opposite, so nonzero matches even-odd and the hole is left alone.
+		opposite := rectContour(250, 750, 750, 250)
+		xml := holeGeom(true, frameOuter, opposite)
+		assertOnePath(t, xml, 2)
+		if !strings.Contains(xml, `<a:moveTo><a:pt x="250" y="750"/></a:moveTo>`) {
+			t.Fatalf("opposite hole was rewritten:\n%s", xml)
+		}
+		if strings.Contains(xml, `<a:moveTo><a:pt x="750" y="250"/></a:moveTo>`) {
+			t.Fatalf("opposite hole was reversed:\n%s", xml)
+		}
+	})
+	t.Run("letter-O", func(t *testing.T) {
+		xml := holeGeom(true, circleContour(500, 500, 400), circleContour(500, 500, 180))
+		assertOnePath(t, xml, 2)
+		// Reversed inner cubic leads with the swapped controls of the last curve
+		// (k = 180*5523/10000 = 99).
+		if !strings.Contains(xml, `<a:pt x="680" y="401"/><a:pt x="599" y="320"/>`) {
+			t.Fatalf("letter O hole was not reversed:\n%s", xml)
+		}
+	})
+	t.Run("donut", func(t *testing.T) {
+		xml := holeGeom(true, octagon(500, 500, 400), octagon(500, 500, 180))
+		assertOnePath(t, xml, 2)
+		// Same-direction inner octagon starts at the last vertex after reversal.
+		if !strings.Contains(xml, `<a:moveTo><a:pt x="627" y="373"/></a:moveTo>`) {
+			t.Fatalf("donut hole was not reversed:\n%s", xml)
+		}
+	})
+}
+
+func holeGeom(evenOdd bool, contours ...[]PathOp) string {
+	var path []PathOp
+	for _, c := range contours {
+		path = append(path, c...)
+	}
+	return formatCustGeom(&Shape{Width: 1000, Height: 1000, HasFill: true, EvenOdd: evenOdd, Path: path})
+}
+
+func assertOnePath(t *testing.T, xml string, contours int) {
+	t.Helper()
+	if strings.Count(xml, "<a:path ") != 1 {
+		t.Fatalf("hole split across %d a:path elements:\n%s", strings.Count(xml, "<a:path "), xml)
+	}
+	if strings.Count(xml, `<a:moveTo>`) != contours {
+		t.Fatalf("want %d contours, xml:\n%s", contours, xml)
+	}
+}
+
+func rectContour(x0, y0, x1, y1 int64) []PathOp {
+	return []PathOp{
+		{Op: "M", X: x0, Y: y0},
+		{Op: "L", X: x1, Y: y0},
+		{Op: "L", X: x1, Y: y1},
+		{Op: "L", X: x0, Y: y1},
+		{Op: "Z"},
+	}
+}
+
+func circleContour(cx, cy, r int64) []PathOp {
+	// Four cubics. k/r ≈ 0.5523, rounded so the hole's reversed controls stay integers.
+	k := r * 5523 / 10000
+	return []PathOp{
+		{Op: "M", X: cx + r, Y: cy},
+		{Op: "C", X: cx, Y: cy + r, X1: cx + r, Y1: cy + k, X2: cx + k, Y2: cy + r},
+		{Op: "C", X: cx - r, Y: cy, X1: cx - k, Y1: cy + r, X2: cx - r, Y2: cy + k},
+		{Op: "C", X: cx, Y: cy - r, X1: cx - r, Y1: cy - k, X2: cx - k, Y2: cy - r},
+		{Op: "C", X: cx + r, Y: cy, X1: cx + k, Y1: cy - r, X2: cx + r, Y2: cy - k},
+		{Op: "Z"},
+	}
+}
+
+func octagon(cx, cy, r int64) []PathOp {
+	// r*0.7071, the diagonal of a regular octagon.
+	d := r * 7071 / 10000
+	pts := [][2]int64{
+		{cx + r, cy}, {cx + d, cy + d}, {cx, cy + r}, {cx - d, cy + d},
+		{cx - r, cy}, {cx - d, cy - d}, {cx, cy - r}, {cx + d, cy - d},
+	}
+	ops := []PathOp{{Op: "M", X: pts[0][0], Y: pts[0][1]}}
+	for _, p := range pts[1:] {
+		ops = append(ops, PathOp{Op: "L", X: p[0], Y: p[1]})
+	}
+	ops = append(ops, PathOp{Op: "Z"})
+	return ops
+}
+
 func TestImageSrcRect(t *testing.T) {
 	xml := formatImage(&Image{
 		X: 1, Y: 2, Width: 100, Height: 80,

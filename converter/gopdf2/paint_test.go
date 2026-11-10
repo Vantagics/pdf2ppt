@@ -230,17 +230,8 @@ func TestNBSLogoKeepsJPEG(t *testing.T) {
 			jpeg++
 		}
 	}
-	if jpeg > 0 && jpeg < 10 {
-		t.Fatalf("logo jpegs %d", jpeg)
-	}
-	var pngLogos int
-	for _, im := range p.Images {
-		if im.Format == "png" && im.Width > 40 && im.Width < 80 && len(im.Data) > 2000 {
-			pngLogos++
-		}
-	}
-	if pngLogos < 10 {
-		t.Fatalf("crisp logo pngs %d", pngLogos)
+	if jpeg < 10 {
+		t.Fatalf("logo jpegs %d, want the original DCT bytes", jpeg)
 	}
 }
 

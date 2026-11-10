@@ -17,5 +17,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
+      - name: Install LibreOffice and Poppler
+        run: sudo apt-get update && sudo apt-get install -y libreoffice-impress poppler-utils
       - name: Validate generated PPTX against ECMA-376
-        run: go test ./converter ./converter/goppt ./converter/gopdf2 -count=1 -timeout 15m -run 'TestOOXML|TestTextOutline|TestMixedPageSize|TestMITSlideSize|TestDominant|TestLetterbox|TestUnmatte|TestFlatten|TestRotatePage|TestMergeHyphen|TestTightWordSpace|TestPDFMaker|TestDeviceGray|TestLightWordmark|TestTwoImages|TestImageClip|TestStitch|TestDropDuplicate|TestPictureCount|TestCanvaScript|TestUAI|TestIndexed|TestDuplicateKeeps|TestZeroAlpha|TestFrame|TestTextRecall|TestChevron|TestRewriteWingdings'
+        run: go test ./converter ./converter/goppt ./converter/gopdf2 -count=1 -timeout 15m -run 'TestOOXML|TestTextOutline|TestHole|TestRendered|TestMixedPageSize|TestMITSlideSize|TestDominant|TestLetterbox|TestUnmatte|TestFlatten|TestRotatePage|TestMergeHyphen|TestTightWordSpace|TestPDFMaker|TestDeviceGray|TestLightWordmark|TestTwoImages|TestImageClip|TestStitch|TestDropDuplicate|TestPictureCount|TestPPTXSize|TestCanvaScript|TestUAI|TestIndexed|TestDuplicateKeeps|TestZeroAlpha|TestFrame|TestTextRecall|TestChevron|TestRewriteWingdings'

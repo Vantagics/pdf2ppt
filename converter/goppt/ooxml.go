@@ -368,55 +368,202 @@ func formatCustGeom(sh *Shape) string {
 		}
 		return v
 	}
+	path := sh.Path
+	if sh.EvenOdd {
+		path = orientEvenOdd(path)
+	}
 	var sb strings.Builder
 	sb.WriteString(`<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/><a:pathLst>`)
-	// One a:path per contour, all in the shape's EMU space, so a word is one
-	// custGeom. Identical contours (a glyph drawn twice) are skipped.
-	writePath := func(ops []PathOp) {
-		if len(ops) == 0 {
-			return
+	// Every contour of one fill stays in a single a:path. PowerPoint fills
+	// each a:path on its own, so a second path meant as a hole is painted solid.
+	sb.WriteString(fmt.Sprintf(`<a:path w="%d" h="%d" fill="%s">`, w, h, fill))
+	started := false
+	for _, op := range path {
+		if !started && op.Op != "M" {
+			sb.WriteString(fmt.Sprintf(`<a:moveTo><a:pt x="%d" y="%d"/></a:moveTo>`, clamp(op.X, w), clamp(op.Y, h)))
+			started = true
 		}
-		sb.WriteString(fmt.Sprintf(`<a:path w="%d" h="%d" fill="%s">`, w, h, fill))
-		for _, op := range ops {
-			switch op.Op {
-			case "M":
-				sb.WriteString(fmt.Sprintf(`<a:moveTo><a:pt x="%d" y="%d"/></a:moveTo>`, clamp(op.X, w), clamp(op.Y, h)))
-			case "L":
-				sb.WriteString(fmt.Sprintf(`<a:lnTo><a:pt x="%d" y="%d"/></a:lnTo>`, clamp(op.X, w), clamp(op.Y, h)))
-			case "C":
-				sb.WriteString(`<a:cubicBezTo>`)
-				sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X1, w), clamp(op.Y1, h)))
-				sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X2, w), clamp(op.Y2, h)))
-				sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X, w), clamp(op.Y, h)))
-				sb.WriteString(`</a:cubicBezTo>`)
-			case "Z":
-				sb.WriteString(`<a:close/>`)
+		if op.Op == "M" {
+			started = true
+		}
+		switch op.Op {
+		case "M":
+			sb.WriteString(fmt.Sprintf(`<a:moveTo><a:pt x="%d" y="%d"/></a:moveTo>`, clamp(op.X, w), clamp(op.Y, h)))
+		case "L":
+			sb.WriteString(fmt.Sprintf(`<a:lnTo><a:pt x="%d" y="%d"/></a:lnTo>`, clamp(op.X, w), clamp(op.Y, h)))
+		case "C":
+			sb.WriteString(`<a:cubicBezTo>`)
+			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X1, w), clamp(op.Y1, h)))
+			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X2, w), clamp(op.Y2, h)))
+			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X, w), clamp(op.Y, h)))
+			sb.WriteString(`</a:cubicBezTo>`)
+		case "Z":
+			sb.WriteString(`<a:close/>`)
+		}
+	}
+	sb.WriteString(`</a:path></a:pathLst></a:custGeom>`)
+	return sb.String()
+}
+
+// orientEvenOdd reverses a hole contour that winds the same way as the shape
+// around it. DrawingML fill="norm" is nonzero, so a same-direction inner
+// contour would fill instead of punch. Even-odd in the PDF wants the hole.
+func orientEvenOdd(path []PathOp) []PathOp {
+	var contours [][]PathOp
+	var cur []PathOp
+	for _, op := range path {
+		if op.Op == "M" && len(cur) > 0 {
+			contours = append(contours, cur)
+			cur = nil
+		}
+		cur = append(cur, op)
+	}
+	if len(cur) > 0 {
+		contours = append(contours, cur)
+	}
+	if len(contours) < 2 {
+		return path
+	}
+	areas := make([]float64, len(contours))
+	cx := make([]float64, len(contours))
+	cy := make([]float64, len(contours))
+	for i, c := range contours {
+		areas[i] = contourArea(c)
+		cx[i], cy[i] = contourCentroid(c)
+	}
+	depth := make([]int, len(contours))
+	for i := range contours {
+		for j := range contours {
+			if i == j {
+				continue
+			}
+			if pointInContour(cx[i], cy[i], contours[j]) {
+				depth[i]++
 			}
 		}
-		sb.WriteString(`</a:path>`)
 	}
-	var contour []PathOp
-	seen := map[string]bool{}
-	flush := func() {
-		if len(contour) == 0 {
-			return
+	out := make([]PathOp, 0, len(path))
+	for i, c := range contours {
+		if depth[i]%2 == 1 {
+			outer := 1.0
+			for j := range contours {
+				if depth[j] == 0 && pointInContour(cx[i], cy[i], contours[j]) && areas[j] != 0 {
+					if areas[j] < 0 {
+						outer = -1
+					}
+					break
+				}
+			}
+			want := -outer
+			sign := 1.0
+			if areas[i] < 0 {
+				sign = -1
+			}
+			if areas[i] != 0 && sign != want {
+				c = reverseContour(c)
+			}
 		}
-		key := fmt.Sprint(contour)
-		if !seen[key] {
-			seen[key] = true
-			writePath(contour)
-		}
-		contour = nil
+		out = append(out, c...)
 	}
-	for _, op := range sh.Path {
-		if op.Op == "M" && len(contour) > 0 {
-			flush()
-		}
-		contour = append(contour, op)
+	return out
+}
+
+func contourArea(ops []PathOp) float64 {
+	pts := contourPoints(ops)
+	if len(pts) < 3 {
+		return 0
 	}
-	flush()
-	sb.WriteString(`</a:pathLst></a:custGeom>`)
-	return sb.String()
+	var a float64
+	for i := range pts {
+		j := (i + 1) % len(pts)
+		a += pts[i][0]*pts[j][1] - pts[j][0]*pts[i][1]
+	}
+	return a / 2
+}
+
+func contourCentroid(ops []PathOp) (float64, float64) {
+	pts := contourPoints(ops)
+	if len(pts) == 0 {
+		return 0, 0
+	}
+	var x, y float64
+	for _, p := range pts {
+		x += p[0]
+		y += p[1]
+	}
+	n := float64(len(pts))
+	return x / n, y / n
+}
+
+func contourPoints(ops []PathOp) [][2]float64 {
+	var pts [][2]float64
+	for _, op := range ops {
+		if op.Op == "M" || op.Op == "L" || op.Op == "C" {
+			pts = append(pts, [2]float64{float64(op.X), float64(op.Y)})
+		}
+	}
+	if len(pts) > 1 && pts[0] == pts[len(pts)-1] {
+		pts = pts[:len(pts)-1]
+	}
+	return pts
+}
+
+func pointInContour(x, y float64, ops []PathOp) bool {
+	pts := contourPoints(ops)
+	inside := false
+	for i, j := 0, len(pts)-1; i < len(pts); j, i = i, i+1 {
+		yi, yj := pts[i][1], pts[j][1]
+		if (yi > y) == (yj > y) {
+			continue
+		}
+		xi, xj := pts[i][0], pts[j][0]
+		xcross := (xj-xi)*(y-yi)/(yj-yi) + xi
+		if x < xcross {
+			inside = !inside
+		}
+	}
+	return inside
+}
+
+func reverseContour(ops []PathOp) []PathOp {
+	if len(ops) == 0 {
+		return ops
+	}
+	startX, startY := ops[0].X, ops[0].Y
+	type seg struct {
+		op    PathOp
+		prevX int64
+		prevY int64
+	}
+	var segs []seg
+	px, py := startX, startY
+	for _, op := range ops[1:] {
+		if op.Op == "Z" {
+			break
+		}
+		segs = append(segs, seg{op, px, py})
+		px, py = op.X, op.Y
+	}
+	if len(segs) == 0 {
+		return ops
+	}
+	out := []PathOp{{Op: "M", X: px, Y: py}}
+	for i := len(segs) - 1; i >= 0; i-- {
+		s := segs[i]
+		switch s.op.Op {
+		case "L":
+			out = append(out, PathOp{Op: "L", X: s.prevX, Y: s.prevY})
+		case "C":
+			out = append(out, PathOp{
+				Op: "C", X: s.prevX, Y: s.prevY,
+				X1: s.op.X2, Y1: s.op.Y2, X2: s.op.X1, Y2: s.op.Y1,
+			})
+		default:
+			out = append(out, PathOp{Op: "L", X: s.prevX, Y: s.prevY})
+		}
+	}
+	out = append(out, PathOp{Op: "Z"})
+	return out
 }
 
 func formatImage(img *Image, id int, imageIdx int) string {

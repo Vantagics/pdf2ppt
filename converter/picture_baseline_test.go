@@ -91,7 +91,11 @@ func TestPictureCountBaseline(t *testing.T) {
 
 // sizeBaseline is the v1.4.0 PPTX size in bytes. v1.4.1 re-encoded JPEG
 // photos as PNG and the corpus grew by 87%. A deck may shrink. It may not
-// grow by more than 10%.
+// grow by more than 10%. The check runs only for a name in this file whose
+// PDF corpusPDF can open. mit-ocw-ses1 and mit-datamgmt are not in the file
+// (it was recorded from the v1.4.0 local corpus) and their PDFs are not
+// under /tmp/corpus, so a size jump on those decks does not fail the test.
+// GitHub CI checks out no corpus PDFs, so the test skips there as well.
 var sizeBaseline map[string]int64
 
 func init() {

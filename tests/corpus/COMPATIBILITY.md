@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.4
+
+`canva-rotary` page 16 no longer clips the last letter of `nonprofit`, `Account`, `for`, or `not-for-profit`. The trailing space stays inside the box. `he-openu-a11y` pages 6, 10, and 13 keep a space between Latin and Hebrew, and unique recall against pdftotext is 1.000. Page 2's 50 and BCG lines are separate boxes again. The stored Hebrew recall baseline was 0.921444 from v1.5.0, which is why 98.54% did not fail the 0.3 pp gate. `uab-reo-m365` gate concat is 1419; an independent count of the same joined text is 1446.
+
 ## v1.5.3
 
 `he-openu-a11y` page 2 first bullet is the v1.5.1 pair (`בישראל 1,600,000`, with `60` in its own box). The 50 line stays `הישראלי: מעל ל 50`, with a space after the bullet and after `BCG:`. `canva-rotary` page 16 keeps about one space between `not-for-profit` and `basis`. `undp-gender-ar` unique recall is 84.62% again. `uab-reo-m365` concatenated tokens are 1419.

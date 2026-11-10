@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 func TestUnmatteBlack(t *testing.T) {
@@ -330,37 +331,116 @@ func TestHebrewReadingOrder(t *testing.T) {
 		}
 		t.Fatalf("60 is not left of the number: sixty x %.1f number x %.1f", x, numBox.X)
 	}
-	var bcg, fifty string
+	var bcg string
 	for _, tb := range p2.TextObjects {
 		if strings.Contains(tb.Content, "BCG") {
 			bcg = tb.Content
-		}
-		if strings.Contains(tb.Content, "50") && !strings.Contains(tb.Content, "050") {
-			fifty = tb.Content
 		}
 	}
 	if bcg == "" || strings.Contains(bcg, "GCB") {
 		t.Fatalf("BCG run was reversed: %q", bcg)
 	}
-	if strings.Contains(fifty, "50מעל") {
-		t.Fatalf("50 glued to מעל: %q", fifty)
+	// The 50 line stays segmented at the PDF x, right to left:
+	// איגוד, then מעל, then 50. One packed paragraph is the p2 SSIM drop.
+	var igud, meal, fiftyBox *TextObject
+	for _, tb := range p2.TextObjects {
+		if strings.Contains(tb.Content, "איגוד") {
+			igud = tb
+		}
 	}
-	// Logical order: the organization, then the colon, then "מעל ל 50".
-	if strings.Index(fifty, "איגוד") < 0 || strings.Index(fifty, "מעל") < 0 || strings.Index(fifty, "50") < 0 {
-		t.Fatalf("50 line is incomplete: %q", fifty)
+	if igud == nil {
+		t.Fatal("50 line lost איגוד")
 	}
-	if strings.Index(fifty, "איגוד") > strings.Index(fifty, "מעל") || strings.Index(fifty, "מעל") > strings.Index(fifty, "50") {
-		t.Fatalf("50 line order: %q", fifty)
+	for _, tb := range p2.TextObjects {
+		if strings.Contains(tb.Content, "מעל") && tb.X < igud.X && (meal == nil || tb.X > meal.X) {
+			meal = tb
+		}
+		if strings.Contains(tb.Content, "50") && !strings.Contains(tb.Content, "050") && !strings.Contains(tb.Content, "איגוד") {
+			if fiftyBox == nil || abs(tb.Y-igud.Y) < abs(fiftyBox.Y-igud.Y) {
+				fiftyBox = tb
+			}
+		}
 	}
-	if !strings.Contains(fifty, "הישראלי:") && !strings.Contains(fifty, "הישראלי :") {
-		t.Fatalf("colon should follow הישראלי: %q", fifty)
+	if meal == nil || fiftyBox == nil {
+		t.Fatal("50 line lost מעל or 50")
 	}
-	if strings.Contains(fifty, "•איגוד") || strings.Contains(fifty, "•מעל") {
-		t.Fatalf("missing space after the bullet: %q", fifty)
+	if !(igud.X > meal.X && meal.X > fiftyBox.X) {
+		t.Fatalf("50 line positions: איגוד %.1f מעל %.1f 50 %.1f", igud.X, meal.X, fiftyBox.X)
 	}
-	if strings.Contains(bcg, "BCG:") && !strings.Contains(bcg, "BCG: ") && !strings.Contains(bcg, ": ") {
-		t.Fatalf("missing space after BCG colon: %q", bcg)
+	if strings.Contains(fiftyBox.Content, "איגוד") || fiftyBox.Width > 400 && strings.Contains(igud.Content, "50") {
+		t.Fatalf("50 line packed: %q / %q", igud.Content, fiftyBox.Content)
 	}
+	for _, tb := range p2.TextObjects {
+		if strings.TrimSpace(tb.Content) == "•" && !strings.HasSuffix(tb.Content, " ") {
+			t.Fatalf("bullet has no trailing space: %q", tb.Content)
+		}
+		if strings.Contains(tb.Content, "BCG") && strings.Contains(tb.Content, ":") && !strings.Contains(tb.Content, ": ") {
+			t.Fatalf("BCG colon spacing: %q", tb.Content)
+		}
+	}
+	// Pages 6, 10, and 13 glued Latin to the next Hebrew word. Concatenated
+	// a:t on one slide has no separator, so the source word dropped out of
+	// unique recall. The join between two slides is not a word.
+	var all strings.Builder
+	for i := 0; i < doc.PageCount(); i++ {
+		pg, err := doc.GetPage(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var pageText strings.Builder
+		for _, tb := range pg.TextObjects {
+			pageText.WriteString(tb.Content)
+			all.WriteString(tb.Content)
+		}
+		if at := touchAt(pageText.String()); at >= 0 {
+			s := pageText.String()
+			lo, hi := at-8, at+12
+			if lo < 0 {
+				lo = 0
+			}
+			if hi > len(s) {
+				hi = len(s)
+			}
+			t.Fatalf("page %d glues hebrew to latin: %q", i+1, s[lo:hi])
+		}
+	}
+	for _, w := range []string{"ולוודא", "מסופקים", "תוויות", "Adobe", "Labels"} {
+		if !strings.Contains(all.String(), w) {
+			t.Fatalf("missing %q", w)
+		}
+	}
+}
+
+func touchAt(s string) int {
+	prev := rune(0)
+	prevEnd := 0
+	for i, r := range s {
+		if unicode.IsSpace(r) {
+			prev = 0
+			continue
+		}
+		if prev != 0 && wordRune(prev) && wordRune(r) && rtlRune(prev) != rtlRune(r) {
+			return prevEnd
+		}
+		prev = r
+		prevEnd = i
+	}
+	return -1
+}
+
+func wordRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+func rtlRune(r rune) bool {
+	return unicode.Is(unicode.Hebrew, r) || unicode.Is(unicode.Arabic, r)
+}
+
+func abs(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func TestRTLLineReadingOrder(t *testing.T) {
@@ -383,24 +463,75 @@ func TestRTLLineReadingOrder(t *testing.T) {
 			line = el.Text.Content
 		}
 	}
-	if name != "אילנה בניש" {
+	if strings.TrimSpace(name) != "אילנה בניש" {
 		t.Fatalf("name %q", name)
 	}
+	line = strings.TrimSpace(line)
 	if line != "• בישראל 1,600,000" && line != "בישראל 1,600,000" {
 		t.Fatalf("line %q", line)
 	}
 }
 
+func TestCanvaRotaryWordsAreNotClipped(t *testing.T) {
+	pdf := corpusFile("canva-rotary")
+	if pdf == "" {
+		t.Skip("canva rotary deck not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := doc.GetPage(15)
+	if err != nil {
+		t.Fatal(err)
+	}
+	need := []string{"nonprofit", "Account", "for", "not-for-profit"}
+	found := map[string]bool{}
+	for _, tb := range p.TextObjects {
+		if tb.Clip && (strings.Contains(tb.Content, "profit") || strings.Contains(tb.Content, "Account") || strings.TrimSpace(tb.Content) == "for") {
+			t.Fatalf("clipped box %q width %.1f", tb.Content, tb.Width)
+		}
+		for _, word := range need {
+			if !strings.Contains(tb.Content, word) {
+				continue
+			}
+			// The letters, not the trailing space, have to fit. A substitute
+			// font can be a little wider than Canva's; 15% is that gap.
+			// Clipping "t" off "nonprofit" is much more than 15%.
+			ink := strings.TrimRight(tb.Content, " ")
+			w, ok := textWidth(tb.FontName, tb.Bold, tb.Italic, tb.FontSize, ink)
+			if ok && w > 1 && tb.Width < w*0.85 {
+				t.Fatalf("box narrower than the advance: %q width %.1f advance %.1f", tb.Content, tb.Width, w)
+			}
+		}
+		for _, word := range need {
+			if strings.Contains(tb.Content, word) {
+				found[word] = true
+			}
+		}
+	}
+	for _, word := range need {
+		if !found[word] {
+			t.Fatalf("page 16 lost %q", word)
+		}
+	}
+}
+
 func TestMergeWordGap(t *testing.T) {
-	// "not-for-profit " overlaps "basis". The visible gap has to be about
-	// one space, not the 0.4 pt crack that still reads as one word.
+	// The first box holds the word and its trailing space. Shrinking it
+	// to open a gap clips the last letter. The next word moves instead.
 	a := &TextObject{Content: "not-for-profit ", X: 100, Y: 0, Width: 80, Height: 14, FontSize: 16}
 	b := &TextObject{Content: "basis", X: 150, Y: 0, Width: 40, Height: 14, FontSize: 16}
 	p := &Page{Elements: []PageElement{{Text: a}, {Text: b}}}
 	pullBackOverlaps(p)
-	gap := b.X - (a.X + a.Width)
-	if gap < 16*0.30 {
-		t.Fatalf("word gap %.2f pt, want at least one space", gap)
+	if a.Width != 80 || a.Clip {
+		t.Fatalf("word box was shrunk or clipped: w %.1f clip %v", a.Width, a.Clip)
+	}
+	if !strings.HasSuffix(a.Content, "t ") {
+		t.Fatalf("last letter dropped: %q", a.Content)
+	}
+	if b.X < a.X+a.Width-0.1 {
+		t.Fatalf("next word still overlaps the word: x %.1f end %.1f", b.X, a.X+a.Width)
 	}
 }
 

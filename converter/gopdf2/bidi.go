@@ -62,12 +62,11 @@ func hasRTLScript(s string) bool {
 	return false
 }
 
-// joinCloseRTLPairs rebuilds one RTL line in reading order.
-// Fragments are already logical. Visual order is left to right, so the
-// paragraph is the right-hand fragment first. A colon is a neutral and
-// stays against the word on its right ("הישראלי:"). A European number is
-// a weak LTR run and keeps its digits ("מעל ל 50"). Pairing only the
-// boxes that almost touched left "מעל ל" on the wrong side of the name.
+// joinCloseRTLPairs joins two neighboring Hebrew words, or a Hebrew word
+// and a number, when their boxes almost touch. The right-hand word comes
+// first. A whole line is not collapsed: that packed the 60 off the left
+// edge and glued "OCR" to the Hebrew beside it. The 50 line stays in
+// separate boxes at the PDF x, which is the reading order.
 func joinCloseRTLPairs(p *Page) {
 	var refs []textRef
 	for i := range p.Elements {
@@ -117,20 +116,13 @@ func joinCloseRTLPairs(p *Page) {
 			if len(g) < 2 || !lineHasRTL(g) {
 				continue
 			}
-			// A colon is a neutral that has to move with the embedding
-			// direction ("הישראלי: מעל ל 50"). Other lines stay as the
-			// v1.5.1 pairs: one box for the whole bullet packs the glyphs
-			// and pulls 60 off the left edge.
-			if lineHasColon(g) {
-				p.Elements[g[0].i].Text = joinRTLReading(g)
-				for _, r := range g[1:] {
-					remove[r.i] = true
-				}
-				continue
-			}
+			// Only a Hebrew word and its neighbor (the name, or בישראל
+			// next to 1,600,000). Joining a whole line packs the glyphs
+			// and glues "OCR" to the following Hebrew.
 			joinClosePairs(p, g, remove)
 		}
 	}
+	padRTLBoundaries(p)
 	if len(remove) == 0 {
 		return
 	}
@@ -142,15 +134,6 @@ func joinCloseRTLPairs(p *Page) {
 		kept = append(kept, el)
 	}
 	p.Elements = kept
-}
-
-func lineHasColon(line []textRef) bool {
-	for _, r := range line {
-		if strings.Contains(r.t.Content, ":") {
-			return true
-		}
-	}
-	return false
 }
 
 // joinClosePairs joins two neighboring runs whose boxes almost touch.
@@ -171,8 +154,30 @@ func joinClosePairs(p *Page, line []textRef, remove map[int]bool) {
 	}
 }
 
+func mostlyNumber(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	digits := 0
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			digits++
+		}
+	}
+	return digits >= 2 && digits*2 >= utf8.RuneCountInString(s)
+}
+
 func closeRTLPair(left, right *TextObject) bool {
-	if !hasRTLScript(left.Content) && !hasRTLScript(right.Content) {
+	lrtl := hasRTLScript(left.Content)
+	rrtl := hasRTLScript(right.Content)
+	// Latin next to Hebrew ("OCR", "Microsoft") stays in its own box so
+	// the PDF gap survives. A number next to Hebrew is the 1,600,000 pair.
+	switch {
+	case lrtl && rrtl:
+	case lrtl && mostlyNumber(right.Content):
+	case rrtl && mostlyNumber(left.Content):
+	default:
 		return false
 	}
 	if utf8.RuneCountInString(strings.TrimSpace(left.Content)) < 2 || utf8.RuneCountInString(strings.TrimSpace(right.Content)) < 2 {
@@ -211,6 +216,132 @@ func joinRTLPair(right, left *TextObject) *TextObject {
 	return &out
 }
 
+func appendSpace(t *TextObject) {
+	if strings.HasSuffix(t.Content, " ") {
+		return
+	}
+	t.Content += " "
+	if n := len(t.Runs); n > 0 {
+		t.Runs[n-1].Content += " "
+	}
+}
+
+// padRTLBoundaries keeps a trailing space on Hebrew, bullets, and
+// colons, and stops merge from gluing the next word on. The space is
+// inside the run, so the box is not shrunk to invent a gap.
+func padRTLBoundaries(p *Page) {
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t == nil || t.Vertical {
+			continue
+		}
+		s := strings.TrimSpace(t.Content)
+		if s == "" {
+			continue
+		}
+		if hasRTLScript(t.Content) {
+			t.holdX = true
+			// A one-letter Hebrew prefix (ו, ב, ה) is its own glyph. A
+			// trailing space would split "ולוודא" into two tokens.
+			if utf8.RuneCountInString(s) >= 2 {
+				appendSpace(t)
+			}
+		}
+		if s == "•" || s == ":" || strings.HasSuffix(s, ":") {
+			appendSpace(t)
+		}
+	}
+}
+
+// separateRTLNeighbors puts a space between a Hebrew or Arabic run and a
+// Latin or digit run that sit in neighboring boxes. Concatenated a:t has
+// no separator, so "Word" + "ניתנים" was one token and the source word
+// dropped out of unique recall.
+func separateRTLNeighbors(p *Page) {
+	var prev *TextObject
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t == nil || strings.TrimSpace(t.Content) == "" {
+			continue
+		}
+		if prev != nil && scriptBoundary(prev.Content, t.Content) && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") {
+			prev.Content += " "
+			// The written a:t comes from the runs when a box has any.
+			if n := len(prev.Runs); n > 0 {
+				prev.Runs[n-1].Content += " "
+			}
+		}
+		prev = t
+	}
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t == nil {
+			continue
+		}
+		t.Content = spaceScriptTouches(t.Content)
+		for r := range t.Runs {
+			t.Runs[r].Content = spaceScriptTouches(t.Runs[r].Content)
+		}
+	}
+}
+
+// spaceScriptTouches inserts a space where a Hebrew or Arabic letter is
+// glued to a Latin letter or a digit inside one run ("Aניווט", "2תוויות").
+func spaceScriptTouches(s string) string {
+	var b strings.Builder
+	var prev rune
+	for _, r := range s {
+		if prev != 0 && !unicode.IsSpace(r) && !unicode.IsSpace(prev) && wordEdge(prev) && wordEdge(r) && rtlLetter(prev) != rtlLetter(r) {
+			b.WriteByte(' ')
+		}
+		b.WriteRune(r)
+		prev = r
+	}
+	return b.String()
+}
+
+func wordEdge(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+func rtlLetter(r rune) bool {
+	return unicode.Is(unicode.Hebrew, r) || unicode.Is(unicode.Arabic, r)
+}
+
+func scriptKind(r rune) int {
+	switch {
+	case unicode.Is(unicode.Hebrew, r) || unicode.Is(unicode.Arabic, r):
+		return 1
+	case unicode.IsLetter(r) || unicode.IsDigit(r):
+		return 2
+	default:
+		return 0
+	}
+}
+
+func edgeKind(s string, last bool) int {
+	rs := []rune(s)
+	if last {
+		for i := len(rs) - 1; i >= 0; i-- {
+			if k := scriptKind(rs[i]); k != 0 {
+				return k
+			}
+		}
+		return 0
+	}
+	for _, r := range rs {
+		if k := scriptKind(r); k != 0 {
+			return k
+		}
+	}
+	return 0
+}
+
+func scriptBoundary(a, b string) bool {
+	ka, kb := edgeKind(a, true), edgeKind(b, false)
+	return ka != 0 && kb != 0 && ka != kb
+}
+
 func lineHasRTL(line []textRef) bool {
 	for _, r := range line {
 		if r.t.RTL || hasRTLScript(r.t.Content) {
@@ -218,96 +349,4 @@ func lineHasRTL(line []textRef) bool {
 		}
 	}
 	return false
-}
-
-func joinRTLReading(g []textRef) *TextObject {
-	items := make([]*TextObject, len(g))
-	for i := range g {
-		items[i] = g[i].t
-	}
-	best := items[0]
-	for _, t := range items[1:] {
-		if utf8.RuneCountInString(strings.TrimSpace(t.Content)) > utf8.RuneCountInString(strings.TrimSpace(best.Content)) {
-			best = t
-		}
-	}
-	var b strings.Builder
-	var prev *TextObject
-	for i := len(items) - 1; i >= 0; i-- {
-		t := items[i]
-		piece := strings.TrimSpace(t.Content)
-		if piece == "" {
-			continue
-		}
-		if prev != nil && rtlWordSeparator(prev, t) {
-			b.WriteByte(' ')
-		}
-		b.WriteString(piece)
-		prev = t
-	}
-	out := *best
-	out.Content = b.String()
-	out.RTL = true
-	out.Runs = nil
-	out.holdX = true
-	minX, minY := items[0].X, items[0].Y
-	maxR, maxB := items[0].X+items[0].Width, items[0].Y+items[0].Height
-	for _, t := range items[1:] {
-		if t.X < minX {
-			minX = t.X
-		}
-		if t.X+t.Width > maxR {
-			maxR = t.X + t.Width
-		}
-		if t.Y < minY {
-			minY = t.Y
-		}
-		if t.Y+t.Height > maxB {
-			maxB = t.Y + t.Height
-		}
-	}
-	out.X, out.Y = minX, minY
-	out.Width, out.Height = maxR-minX, maxB-minY
-	if out.Width < 1 {
-		out.Width = 1
-	}
-	return &out
-}
-
-// rtlWordSeparator reports a word space between the fragment already
-// written (the one to the right) and the next fragment to its left.
-// A colon is a neutral: it takes the embedding direction and sticks to
-// the Hebrew word on its right. A deep overlap is one word painted
-// twice, not a missing space.
-func rtlWordSeparator(right, left *TextObject) bool {
-	piece := strings.TrimSpace(left.Content)
-	if piece == "" {
-		return false
-	}
-	rightS := strings.TrimSpace(right.Content)
-	// A bullet and a colon take a following space ("• איגוד", "BCG: ישראל").
-	if rightS == "•" || strings.HasSuffix(rightS, ":") {
-		return true
-	}
-	if neutralPunct(piece) {
-		return false
-	}
-	gap := right.X - (left.X + left.Width)
-	shorter := math.Min(right.Width, left.Width)
-	if shorter > 1 && -gap > shorter*0.5 {
-		return false
-	}
-	return true
-}
-
-func neutralPunct(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if !unicode.IsPunct(r) && r != ':' {
-			return false
-		}
-	}
-	return true
 }

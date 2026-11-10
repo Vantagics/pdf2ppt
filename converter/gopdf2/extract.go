@@ -78,6 +78,7 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	uncoverOverlaidGlyphs(page)
 	joinCloseRTLPairs(page)
 	mergeTextLines(page)
+	separateRTLNeighbors(page)
 	attachSubscripts(page)
 	closeSubscriptHoles(page)
 	tightenHeldFences(page)
@@ -86,6 +87,9 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	coalesceGlyphShapes(page)
 	dropWhiteTextCovers(page)
 	compositeStencils(page)
+	// Later passes can glue a Latin letter back onto Hebrew. The space has
+	// to be in the text that is actually written.
+	separateRTLNeighbors(page)
 	page.syncLists()
 	return page, nil
 }

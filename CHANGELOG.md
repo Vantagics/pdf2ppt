@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.4
+
+`canva-rotary` page 16 was clipping the last letter of a word that ends with a space. The box was shortened to open a gap, and PowerPoint drew "nonprofi", "Accoun", "fo", and "not-for-profi". The box keeps the PDF width, which already holds the glyph advance and the space, and the next word slides to the right of that box. `wrap="none"` and no clip, so the final t and r stay visible.
+
+`he-openu-a11y` pages 6, 10, and 13 had glued "OCR", "Microsoft Word", "Adobe", and "3.3.2" onto the following Hebrew. Unique recall on this repo's tokenizer is 1.000 again. `TestTextRecallBaseline` did not fail at 98.54% because the stored baseline was still 0.921444, the value from v1.5.0 when the deck was added, before the reading-order fixes. It was not rewritten downward. It is 1.000 now. A one-letter Hebrew prefix stays attached, so "ולוודא" is one token.
+
+The 50 and BCG lines are separate boxes at the PDF x again, in the same order: איגוד, then מעל ל, then 50, and BCG with a space after the colon. The first bullet is unchanged: בישראל 1,600,000 in one box under 280 pt, and 60 to its left.
+
+`uab-reo-m365` joined `a:t` is identical in v1.5.2 and v1.5.3. An independent count of that text is 1446. The gate regex, unique casefolded `[A-Za-z0-9']{2,}` with `&apos;` left encoded, reads 1419, 27 lower. The recorded gate value stays 1419 so the floor matches the counter. The tokens missing since v1.5.1 are glued artifacts that are not in pdftotext.
+
 ## 1.5.3
 
 The first Hebrew bullet is a pair again, not one packed line. `בישראל 1,600,000` stays together and `60` stays in its own box on the left, which is the v1.5.1 layout. Lines with a colon still reorder: `הישראלי: מעל ל 50`, with a space after the bullet and after `BCG:`.

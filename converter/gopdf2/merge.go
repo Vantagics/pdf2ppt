@@ -978,16 +978,19 @@ func pullBackOverlaps(p *Page) {
 		// and runs into the next word is the Canva "nonprofitorganizations"
 		// glue: stop the box at the next word.
 		wordEdge := strings.HasSuffix(a.Content, " ") || strings.HasPrefix(b.Content, " ")
-		if overlap < math.Max(em*1.2, old*0.18) && !(wordEdge && overlap > 1.2) {
+		if wordEdge {
+			// The box already holds the word and its trailing space.
+			// Shrinking it clipped the last letter ("nonprofi", "Accoun").
+			// Slide the next word to the right of the full advance.
+			if b.X < a.X+a.Width {
+				b.X = a.X + a.Width
+			}
 			continue
 		}
-		// A word boundary needs about one space of background, not a
-		// 0.4 pt crack. "not-for-profit" was touching "basis".
-		pad := 0.4
-		if wordEdge {
-			pad = math.Max(pad, em*0.33)
+		if overlap < math.Max(em*1.2, old*0.18) {
+			continue
 		}
-		nw := b.X - a.X - pad
+		nw := b.X - a.X - 0.4
 		if nw < em*0.4 {
 			continue
 		}

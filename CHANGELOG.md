@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.4
+
+An outlined symbol keeps its character in the text box with no fill, so `a:t` still contains the bullet, `$`, `#`, `%`, `(`, and `@` that v1.4.3 dropped. A common punctuation mark or a bullet is outlined only when the embedded font has a handful of glyphs (the Keynote lock). A bullet in a normal text face stays real text. `TestPictureCountBaseline` fails if concatenated `a:t` tokens fall more than 0.3% under the stored v1.4.2 counts.
+
+Type 3 letters on one line share one shape. Coordinates snap to a 0.15 pt grid (an integer number of EMU), a flat cubic becomes a line, and each contour is its own `a:path`. cesar2025-ai page 14 goes from 192 custom geometries and 796 KB of slide XML to 98 geometries and 601 KB.
+
+The KUST subscript is attached to the letter whose box ends next to the digit, and a small overlap with the following parenthesis no longer clips that letter away. The heading reads `p₂ = p₁ + ρg z₁( − z₂)`.
+
+A logo JPEG at most 400 px on a side is stored as PNG. Page photos stay JPEG. The NBS marks are about 130 px wide; PNG keeps PowerPoint from softening the DCT.
+
 ## 1.4.3
 
 cesar2025-ai page 14 is Type 3 text: each letter is a glyph outline, and Noto Sans in its place was the 0.686 slide. Those outlines are drawn, and the characters stay in the text box with no fill so recall is unchanged. CJK stays filled text.

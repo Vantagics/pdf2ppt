@@ -77,6 +77,7 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	attachSubscripts(page)
 	pullBackOverlaps(page)
 	replaceIsolatedSymbols(page)
+	coalesceGlyphShapes(page)
 	page.syncLists()
 	return page, nil
 }

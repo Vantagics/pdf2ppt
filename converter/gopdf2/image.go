@@ -58,6 +58,16 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 	needPixels := smask != nil || opacity < 0.999 || invert || csName != "rgb" || bpc != 8
 
 	if isJPEG(raw) && !needPixels {
+		// A page photo stays the original JPEG. A small logo JPEG is stored
+		// as PNG so PowerPoint does not soften the DCT when it draws the mark.
+		if width <= 400 && height <= 400 {
+			if img, err := jpeg.Decode(bytes.NewReader(raw)); err == nil {
+				var buf bytes.Buffer
+				if err := png.Encode(&buf, img); err == nil {
+					return buf.Bytes(), "png", nil
+				}
+			}
+		}
 		return raw, "jpeg", nil
 	}
 

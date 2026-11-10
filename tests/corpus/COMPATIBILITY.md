@@ -1,5 +1,13 @@
 # Compatibility notes
 
+## v1.4.4
+
+Outlined symbols stay in `a:t` with no fill. Common punctuation and bullets are outlined only for a tiny symbolic font, so a body-font bullet stays text. Concatenated `a:t` tokens may not fall more than 0.3% under the v1.4.2 counts.
+
+Type 3 glyphs on one line are one shape, snapped to a 0.15 pt grid, with one `a:path` per contour. cesar page 14 slide XML is 601 KB (was 796 KB) and 98 custom geometries (was 192).
+
+The KUST `(z…)` subscript hangs on the letter it sits under. Small NBS logo JPEGs are stored as PNG.
+
 ## v1.4.3
 
 Type 3 slide text is drawn from the glyph outlines (cesar2025-ai page 14). The characters stay in the text box without a fill. A subscript is a baseline-shifted run inside the same box; 2024 is not one. The psumac lock is the symbolic font's outline, not `$`. NBS logo JPEGs with a solid-white soft mask stay JPEG. A run that overlaps the next word is clipped back.

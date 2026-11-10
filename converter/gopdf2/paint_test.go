@@ -195,10 +195,14 @@ func TestPsumacLockIsOutline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var dollar bool
 	for _, tObj := range p.TextObjects {
-		if strings.TrimSpace(tObj.Content) == "$" {
-			t.Fatalf("lock is still the text %q", tObj.Content)
+		if strings.TrimSpace(tObj.Content) == "$" && tObj.NoFill {
+			dollar = true
 		}
+	}
+	if !dollar {
+		t.Fatal("lock character left a:t; it must stay as noFill text")
 	}
 	var shapes int
 	for _, el := range p.Elements {
@@ -226,8 +230,17 @@ func TestNBSLogoKeepsJPEG(t *testing.T) {
 			jpeg++
 		}
 	}
-	if jpeg < 10 {
-		t.Fatalf("logo jpegs %d, opaque soft masks were still re-encoded", jpeg)
+	if jpeg > 0 && jpeg < 10 {
+		t.Fatalf("logo jpegs %d", jpeg)
+	}
+	var pngLogos int
+	for _, im := range p.Images {
+		if im.Format == "png" && im.Width > 40 && im.Width < 80 && len(im.Data) > 2000 {
+			pngLogos++
+		}
+	}
+	if pngLogos < 10 {
+		t.Fatalf("crisp logo pngs %d", pngLogos)
 	}
 }
 

@@ -9,6 +9,17 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+func commonTextMark(ch rune) bool {
+	if ch <= 0x7e && unicode.IsPunct(ch) {
+		return true
+	}
+	switch ch {
+	case '•', '●', '○', '◦', '▪', '▫', '▸', '►', '·', '∙':
+		return true
+	}
+	return false
+}
+
 // symbolShape draws one isolated character from an embedded symbolic font
 // as a filled outline. Keynote's lock is a TrueType glyph whose cmap entry
 // is "$"; painting that code in Noto Sans is the giant dollar sign.
@@ -18,6 +29,7 @@ import (
 // into the embedded glyph outline. The Keynote lock stays "$" until here,
 // then becomes the lock path. A comma inside "你好，世界" was already merged.
 func replaceIsolatedSymbols(p *Page) {
+	var extra []PageElement
 	for i := range p.Elements {
 		t := p.Elements[i].Text
 		if t == nil || len(t.symbolProg) == 0 || len(t.Runs) > 0 {
@@ -27,8 +39,13 @@ func replaceIsolatedSymbols(p *Page) {
 		if sh == nil {
 			continue
 		}
-		p.Elements[i] = PageElement{Shape: sh}
+		// The character stays in a:t with no fill, the same way Type 3 text does,
+		// so a bullet or a "$" still splits tokens. The outline is the ink.
+		t.NoFill = true
+		t.symbolProg = nil
+		extra = append(extra, PageElement{Shape: sh})
 	}
+	p.Elements = append(p.Elements, extra...)
 }
 
 func symbolShape(prog []byte, text string, originX, baselineY, size float64, r, g, b uint8) *ShapeObject {
@@ -46,12 +63,15 @@ func symbolShape(prog []byte, text string, originX, baselineY, size float64, r, 
 	if err != nil {
 		return nil
 	}
+	// A bullet or "$" in a real text face stays text. An icon subset has only
+	// a handful of glyphs, and the code point ("$") is not the drawing.
+	if commonTextMark(ch) && font.NumGlyphs() > 8 {
+		return nil
+	}
 	var buf sfnt.Buffer
 	gid, err := font.GlyphIndex(&buf, ch)
 	if err != nil || gid == 0 {
-		// A one-glyph subset often stores the icon at index 1 and the PDF
-		// encoding, not the cmap, is what selects it.
-		if font.NumGlyphs() < 2 {
+		if font.NumGlyphs() > 4 {
 			return nil
 		}
 		gid = 1

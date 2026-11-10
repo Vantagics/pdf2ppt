@@ -1,0 +1,22 @@
+{
+  "source": "v1.4.2",
+  "note": "Unique Latin tokens after concatenating every a:t. A later build fails if a deck drops more than 0.3 percent.",
+  "tokens": {
+    "canva": 407,
+    "cdc": 894,
+    "imperial": 897,
+    "kust": 17,
+    "ltu-gslides": 301,
+    "mine": 141,
+    "neurips": 1328,
+    "nv-ada": 265,
+    "psumac": 458,
+    "saasopen": 242,
+    "tencent": 1366,
+    "tx-hhs": 167,
+    "uab-isc": 628,
+    "uab-reo": 1435,
+    "undp": 2,
+    "wps": 7
+  }
+}

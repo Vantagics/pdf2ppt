@@ -74,6 +74,14 @@ func TestPictureCountBaseline(t *testing.T) {
 					t.Fatalf("unique latin tokens %d, v1.3.7 baseline %d", got, want.Tokens)
 				}
 			}
+			if base, ok := tokenBaseline[name]; ok && base > 0 {
+				got := pptxConcatTokens(t, out)
+				// v1.4.2 concatenates every a:t before splitting words, so a
+				// missing bullet glues the neighbors. 0.3 percent under fails.
+				if float64(got) < float64(base)*0.997 {
+					t.Fatalf("concatenated tokens %d, v1.4.2 baseline %d", got, base)
+				}
+			}
 		})
 	}
 	if found == 0 {
@@ -160,6 +168,56 @@ var (
 	picRe = regexp.MustCompile(`(?s)<p:pic>.*?</p:pic>`)
 	extRe = regexp.MustCompile(`<a:ext cx="(\d+)" cy="(\d+)"`)
 )
+
+var tokenBaseline map[string]int
+
+func init() {
+	raw, err := os.ReadFile("testdata/token_baseline_v142.json")
+	if err != nil {
+		return
+	}
+	var doc struct {
+		Tokens map[string]int `json:"tokens"`
+	}
+	if json.Unmarshal(raw, &doc) == nil {
+		tokenBaseline = doc.Tokens
+	}
+}
+
+// pptxConcatTokens counts unique Latin words after joining every a:t with
+// no separator, which is how the corpus recall score sees a missing bullet.
+func pptxConcatTokens(t *testing.T, path string) int {
+	t.Helper()
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer z.Close()
+	var b strings.Builder
+	for _, f := range z.File {
+		name := f.Name
+		if !strings.HasPrefix(name, "ppt/slides/slide") || !strings.HasSuffix(name, ".xml") || strings.Contains(name, "/_rels/") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range regexp.MustCompile(`<a:t>([^<]*)</a:t>`).FindAllStringSubmatch(string(body), -1) {
+			b.WriteString(strings.NewReplacer("&amp;", "&", "&lt;", "<", "&gt;", ">").Replace(m[1]))
+		}
+	}
+	seen := map[string]bool{}
+	for _, w := range regexp.MustCompile(`[A-Za-z0-9']{2,}`).FindAllString(b.String(), -1) {
+		seen[strings.ToLower(w)] = true
+	}
+	return len(seen)
+}
 
 func pptxTokens(t *testing.T, path string) int {
 	t.Helper()

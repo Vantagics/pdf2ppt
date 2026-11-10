@@ -349,13 +349,25 @@ func attachSubscripts(p *Page) {
 		if !subscriptCandidate(sub.t) {
 			continue
 		}
+		var best *ref
+		bestEdge := math.MaxFloat64
 		for i := range refs {
 			b := &refs[i]
 			if b.i == sub.i || subscriptCandidate(b.t) || !subscriptHost(b.t, sub.t) {
 				continue
 			}
-			pairs = append(pairs, pair{b.t, sub.t, sub.i})
-			break
+			// The digit hangs on the letter it sits under. That letter's box
+			// ends just to the right of the digit; a later parenthesis that
+			// merely overlaps the same x is the wrong host.
+			edge := b.t.X + b.t.Width - sub.t.X
+			if edge < 0 || edge >= bestEdge {
+				continue
+			}
+			bestEdge = edge
+			best = b
+		}
+		if best != nil {
+			pairs = append(pairs, pair{best.t, sub.t, sub.i})
 		}
 	}
 	// Rightmost subscript first so earlier cut indexes stay put.
@@ -423,19 +435,16 @@ func insertSubscript(body, sub *TextObject) {
 	if total < 1 || body.Width < 0.5 {
 		return
 	}
-	rel := (sub.X - body.X) / body.Width
-	if rel < 0 {
-		rel = 0
-	}
-	if rel > 1 {
-		rel = 1
-	}
-	at := int(math.Round(rel * float64(total)))
-	if at < 1 {
-		at = 1
-	}
-	if at > total {
-		at = total
+	// Put the digit after the glyph whose right edge is nearest the digit.
+	at := 1
+	bestDist := math.MaxFloat64
+	for k := 1; k <= total; k++ {
+		edge := body.X + float64(k)/float64(total)*body.Width
+		d := math.Abs(edge - sub.X)
+		if d < bestDist {
+			bestDist = d
+			at = k
+		}
 	}
 	drop := baseline(sub) - baseline(body)
 	pct := -drop / body.FontSize * 100000
@@ -514,6 +523,12 @@ func pullBackOverlaps(p *Page) {
 			continue
 		}
 		old := a.Width
+		overlap := a.X + a.Width - b.X
+		// A formula's last glyph may cross the next parenthesis by a few
+		// points. Only a real collision (Andy through Morodo) is pulled back.
+		if overlap < math.Max(em*1.2, old*0.18) {
+			continue
+		}
 		nw := b.X - a.X - 0.4
 		if nw < em*0.4 {
 			continue

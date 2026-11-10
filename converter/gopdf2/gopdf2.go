@@ -141,6 +141,8 @@ type ShapeObject struct {
 	SimpleRect                bool
 	Path                      []PathOp
 	Gradient                  *Gradient
+	// Glyph marks a Type 3 outline. Adjacent glyphs on one line become one shape.
+	Glyph bool
 }
 
 // Open reads and validates a PDF file.

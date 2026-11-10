@@ -370,32 +370,52 @@ func formatCustGeom(sh *Shape) string {
 	}
 	var sb strings.Builder
 	sb.WriteString(`<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/><a:pathLst>`)
-	sb.WriteString(fmt.Sprintf(`<a:path w="%d" h="%d" fill="%s">`, w, h, fill))
-	started := false
-	for _, op := range sh.Path {
-		if !started && op.Op != "M" {
-			sb.WriteString(fmt.Sprintf(`<a:moveTo><a:pt x="%d" y="%d"/></a:moveTo>`, clamp(op.X, w), clamp(op.Y, h)))
-			started = true
+	// One a:path per contour, all in the shape's EMU space, so a word is one
+	// custGeom. Identical contours (a glyph drawn twice) are skipped.
+	writePath := func(ops []PathOp) {
+		if len(ops) == 0 {
+			return
 		}
-		if op.Op == "M" {
-			started = true
+		sb.WriteString(fmt.Sprintf(`<a:path w="%d" h="%d" fill="%s">`, w, h, fill))
+		for _, op := range ops {
+			switch op.Op {
+			case "M":
+				sb.WriteString(fmt.Sprintf(`<a:moveTo><a:pt x="%d" y="%d"/></a:moveTo>`, clamp(op.X, w), clamp(op.Y, h)))
+			case "L":
+				sb.WriteString(fmt.Sprintf(`<a:lnTo><a:pt x="%d" y="%d"/></a:lnTo>`, clamp(op.X, w), clamp(op.Y, h)))
+			case "C":
+				sb.WriteString(`<a:cubicBezTo>`)
+				sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X1, w), clamp(op.Y1, h)))
+				sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X2, w), clamp(op.Y2, h)))
+				sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X, w), clamp(op.Y, h)))
+				sb.WriteString(`</a:cubicBezTo>`)
+			case "Z":
+				sb.WriteString(`<a:close/>`)
+			}
 		}
-		switch op.Op {
-		case "M":
-			sb.WriteString(fmt.Sprintf(`<a:moveTo><a:pt x="%d" y="%d"/></a:moveTo>`, clamp(op.X, w), clamp(op.Y, h)))
-		case "L":
-			sb.WriteString(fmt.Sprintf(`<a:lnTo><a:pt x="%d" y="%d"/></a:lnTo>`, clamp(op.X, w), clamp(op.Y, h)))
-		case "C":
-			sb.WriteString(`<a:cubicBezTo>`)
-			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X1, w), clamp(op.Y1, h)))
-			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X2, w), clamp(op.Y2, h)))
-			sb.WriteString(fmt.Sprintf(`<a:pt x="%d" y="%d"/>`, clamp(op.X, w), clamp(op.Y, h)))
-			sb.WriteString(`</a:cubicBezTo>`)
-		case "Z":
-			sb.WriteString(`<a:close/>`)
-		}
+		sb.WriteString(`</a:path>`)
 	}
-	sb.WriteString(`</a:path></a:pathLst></a:custGeom>`)
+	var contour []PathOp
+	seen := map[string]bool{}
+	flush := func() {
+		if len(contour) == 0 {
+			return
+		}
+		key := fmt.Sprint(contour)
+		if !seen[key] {
+			seen[key] = true
+			writePath(contour)
+		}
+		contour = nil
+	}
+	for _, op := range sh.Path {
+		if op.Op == "M" && len(contour) > 0 {
+			flush()
+		}
+		contour = append(contour, op)
+	}
+	flush()
+	sb.WriteString(`</a:pathLst></a:custGeom>`)
 	return sb.String()
 }
 

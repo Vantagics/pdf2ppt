@@ -1,6 +1,10 @@
 package gopdf2
 
 import (
+	"fmt"
+	"math"
+	"strings"
+
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 )
@@ -122,7 +126,8 @@ func (ip *interp) paintType3(raw []byte) bool {
 		X: minX - ip.originX, Y: (ip.originY + ip.pageH) - maxY,
 		Width: maxX - minX, Height: maxY - minY,
 		HasFill: true, FillAlpha: ip.gs.fillAlpha,
-		Path: opsToLocal(pts, minX, maxY),
+		Path:  quantizePath(opsToLocal(pts, minX, maxY)),
+		Glyph: true,
 	}
 	sh.FillR, sh.FillG, sh.FillB = ip.gs.fill.bytes()
 	if sh.FillAlpha <= 0 {
@@ -228,4 +233,173 @@ func execType3Proc(data []byte) []pathOp {
 		_ = have
 	}
 	return ops
+}
+
+// quantizePath snaps coordinates to 0.15 pt (1905 EMU) and turns a cubic
+// whose controls sit on the chord into a line. A Type 3 letter otherwise
+// writes dozens of full-precision beziers.
+func quantizePath(ops []PathOp) []PathOp {
+	const grid = 0.15
+	snap := func(v float64) float64 {
+		return math.Round(v/grid) * grid
+	}
+	var out []PathOp
+	var cx, cy float64
+	have := false
+	for _, op := range ops {
+		op.X, op.Y = snap(op.X), snap(op.Y)
+		op.X1, op.Y1 = snap(op.X1), snap(op.Y1)
+		op.X2, op.Y2 = snap(op.X2), snap(op.Y2)
+		switch op.Op {
+		case "C":
+			if have && flatCubic(cx, cy, op.X1, op.Y1, op.X2, op.Y2, op.X, op.Y) {
+				op = PathOp{Op: "L", X: op.X, Y: op.Y}
+			}
+		}
+		if have && (op.Op == "L" || op.Op == "M") && op.X == cx && op.Y == cy {
+			continue
+		}
+		out = append(out, op)
+		if op.Op == "M" || op.Op == "L" || op.Op == "C" {
+			cx, cy = op.X, op.Y
+			have = true
+		}
+	}
+	return out
+}
+
+func flatCubic(x0, y0, x1, y1, x2, y2, x3, y3 float64) bool {
+	// Controls within 0.2 pt of the straight chord.
+	d := func(px, py float64) float64 {
+		dx, dy := x3-x0, y3-y0
+		l := math.Hypot(dx, dy)
+		if l < 0.2 {
+			return math.Hypot(px-x0, py-y0)
+		}
+		return math.Abs(dy*(px-x0)-dx*(py-y0)) / l
+	}
+	return d(x1, y1) < 0.2 && d(x2, y2) < 0.2
+}
+
+// coalesceGlyphShapes joins Type 3 glyphs that sit on one line into a single
+// shape, so a word is one custGeom instead of a shape per letter.
+func coalesceGlyphShapes(p *Page) {
+	type item struct {
+		i  int
+		sh *ShapeObject
+	}
+	var items []item
+	for i := range p.Elements {
+		sh := p.Elements[i].Shape
+		if sh != nil && sh.Glyph && len(sh.Path) > 0 {
+			items = append(items, item{i, sh})
+		}
+	}
+	if len(items) < 2 {
+		return
+	}
+	sortItems := func() {
+		for i := 1; i < len(items); i++ {
+			for j := i; j > 0; j-- {
+				a, b := items[j].sh, items[j-1].sh
+				if a.Y < b.Y-1 || (math.Abs(a.Y-b.Y) <= 1 && a.X < b.X) {
+					items[j], items[j-1] = items[j-1], items[j]
+					continue
+				}
+				break
+			}
+		}
+	}
+	sortItems()
+	remove := map[int]bool{}
+	used := map[int]bool{}
+	for i := 0; i < len(items); i++ {
+		if used[items[i].i] {
+			continue
+		}
+		base := items[i].sh
+		group := []item{items[i]}
+		used[items[i].i] = true
+		right := base.X + base.Width
+		for k := i + 1; k < len(items); k++ {
+			if used[items[k].i] {
+				continue
+			}
+			n := items[k].sh
+			if n.FillR != base.FillR || n.FillG != base.FillG || n.FillB != base.FillB {
+				continue
+			}
+			if math.Abs((n.Y+n.Height/2)-(base.Y+base.Height/2)) > math.Max(base.Height, n.Height)*0.45 {
+				continue
+			}
+			if n.X > right+base.Height*0.8 {
+				continue
+			}
+			group = append(group, items[k])
+			used[items[k].i] = true
+			if n.X+n.Width > right {
+				right = n.X + n.Width
+			}
+		}
+		if len(group) < 2 {
+			continue
+		}
+		minX, minY := group[0].sh.X, group[0].sh.Y
+		maxX, maxY := minX+group[0].sh.Width, minY+group[0].sh.Height
+		var path []PathOp
+		seen := map[string]bool{}
+		for _, g := range group {
+			sh := g.sh
+			if sh.X < minX {
+				minX = sh.X
+			}
+			if sh.Y < minY {
+				minY = sh.Y
+			}
+			if sh.X+sh.Width > maxX {
+				maxX = sh.X + sh.Width
+			}
+			if sh.Y+sh.Height > maxY {
+				maxY = sh.Y + sh.Height
+			}
+		}
+		for _, g := range group {
+			sh := g.sh
+			var rel strings.Builder
+			for _, op := range sh.Path {
+				fmt.Fprintf(&rel, "%s %.2f %.2f %.2f %.2f %.2f %.2f;", op.Op, op.X, op.Y, op.X1, op.Y1, op.X2, op.Y2)
+			}
+			key := fmt.Sprintf("%.2f,%.2f|%s", sh.X, sh.Y, rel.String())
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			for _, op := range sh.Path {
+				op.X += sh.X - minX
+				op.Y += sh.Y - minY
+				op.X1 += sh.X - minX
+				op.Y1 += sh.Y - minY
+				op.X2 += sh.X - minX
+				op.Y2 += sh.Y - minY
+				path = append(path, op)
+			}
+			if g.i != items[i].i {
+				remove[g.i] = true
+			}
+		}
+		base.X, base.Y = minX, minY
+		base.Width, base.Height = maxX-minX, maxY-minY
+		base.Path = quantizePath(path)
+	}
+	if len(remove) == 0 {
+		return
+	}
+	kept := p.Elements[:0]
+	for i, el := range p.Elements {
+		if remove[i] {
+			continue
+		}
+		kept = append(kept, el)
+	}
+	p.Elements = kept
 }

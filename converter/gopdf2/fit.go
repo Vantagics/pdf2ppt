@@ -13,12 +13,14 @@ import (
 )
 
 // fitRun chooses the system font LibreOffice will actually draw and, when
-// that font's advance differs from the PDF run, returns a size and per-glyph
-// tracking (points, negative tightens) so the run occupies pdfWidth.
+// that font's advance differs from the PDF run, returns a size and a small
+// per-glyph tracking (points). Tracking stays within a few percent of an em
+// so glyphs are not condensed; a larger mismatch is a uniform size change.
 func fitRun(family string, bold, italic bool, size, pdfWidth float64, text string) (string, float64, float64) {
 	if size < 0.5 || pdfWidth < 0.5 || strings.TrimSpace(text) == "" {
 		return family, size, 0
 	}
+	family = preferMetricFamily(family)
 	path, resolved, ok := matchSystemFont(family, bold, italic)
 	if !ok {
 		return family, size, 0
@@ -44,39 +46,57 @@ func fitRun(family string, bold, italic bool, size, pdfWidth float64, text strin
 // trackingFor returns the font size and per-character tracking (points) that
 // make measured ink match pdfWidth. Spacing is applied between characters,
 // not after the last one.
+// preferMetricFamily maps faces that are not installed here onto a system
+// family with a real bold and italic, instead of a faux slant of Cantarell.
+func preferMetricFamily(family string) string {
+	switch strings.ToLower(strings.TrimSpace(family)) {
+	case "gill sans", "gill sans mt", "gillsans":
+		return "Liberation Sans"
+	case "trebuchet ms", "trebuchetms":
+		return "Liberation Sans"
+	case "palatino", "palatino-roman", "palatino linotype", "palatinolinotype":
+		return "Liberation Serif"
+	case "marker felt", "marker felt thin", "markerfelt", "markerfelt-thin":
+		return "Liberation Sans"
+	default:
+		return family
+	}
+}
+
 func trackingFor(text string, size, pdfWidth, measured float64, remeasure func(float64) float64) (float64, float64) {
 	gaps := len([]rune(text)) - 1
 	ratio := pdfWidth / measured
 	if ratio > 0.985 && ratio < 1.015 {
 		return size, 0
 	}
-	sz := size
-	// Prefer tracking over a size change so runs that share a line stay the
-	// same height. Only a large mismatch is worth scaling.
-	if ratio < 0.70 || ratio > 1.40 {
-		sz = size * ratio
-		if sz < size*0.72 {
-			sz = size * 0.72
-		}
-		if sz > size*1.2 {
-			sz = size * 1.2
-		}
+	// Scale the whole em first. Negative tracking condenses the letters, which
+	// is the "Gotham University" squeeze, so it is only a small remainder.
+	sz := size * ratio
+	if sz < size*0.82 {
+		sz = size * 0.82
+	}
+	if sz > size*1.12 {
+		sz = size * 1.12
+	}
+	if math.Abs(sz-size) > 0.05 {
 		if w := remeasure(sz); w > 0.5 {
 			measured = w
 		}
+	} else {
+		sz = size
 	}
 	if gaps < 1 || measured < 0.5 {
 		return sz, 0
 	}
 	tr := (pdfWidth - measured) / float64(gaps)
-	limit := sz * 0.45
+	limit := sz * 0.04
 	if tr > limit {
 		tr = limit
 	}
 	if tr < -limit {
 		tr = -limit
 	}
-	if math.Abs(tr) < 0.04 {
+	if math.Abs(tr) < 0.03 {
 		return sz, 0
 	}
 	return sz, tr
@@ -220,12 +240,70 @@ func suppressDuplicateGlyphOutlines(els []PageElement) []PageElement {
 	}
 	out := make([]PageElement, 0, len(els))
 	for _, el := range els {
-		if el.Shape != nil && glyphOutlineOfText(el.Shape, texts) {
-			continue
+		if el.Shape != nil {
+			if t := outlineHost(el.Shape, texts); t != nil {
+				// The contour is part of the letter's weight (the light
+				// "THIS IS A" next to a heavy "SAMPLE"). Keep it as a text
+				// outline on the same run instead of a second, misaligned copy.
+				absorbOutline(t, el.Shape)
+				continue
+			}
 		}
 		out = append(out, el)
 	}
 	return out
+}
+
+func outlineHost(s *ShapeObject, texts []*TextObject) *TextObject {
+	if !glyphOutlineOfText(s, texts) {
+		return nil
+	}
+	cx := s.X + s.Width/2
+	cy := s.Y + s.Height/2
+	const pad = 3.0
+	for _, t := range texts {
+		if t.FontSize < 4 || t.Width < 2 {
+			continue
+		}
+		if cx < t.X-pad || cx > t.X+t.Width+pad || cy < t.Y-pad || cy > t.Y+t.Height+pad {
+			continue
+		}
+		return t
+	}
+	return nil
+}
+
+func absorbOutline(t *TextObject, s *ShapeObject) {
+	if s.StrokeWidth < 0.35 {
+		return
+	}
+	// A run that was already fill-and-stroke (PowerPoint mode 2) keeps its
+	// own weight. Only a plain fill that was doubled by a heavy contour
+	// needs the bold face; LibreOffice draws a:ln too faintly to carry it.
+	hadStroke := t.Stroke
+	if !t.Stroke || t.StrokeWidth < s.StrokeWidth {
+		t.Stroke = true
+		t.StrokeOnly = false
+		t.StrokeWidth = s.StrokeWidth
+		t.StrokeR, t.StrokeG, t.StrokeB = s.StrokeR, s.StrokeG, s.StrokeB
+	}
+	if hadStroke || t.Bold || s.StrokeWidth < t.FontSize*0.025 {
+		return
+	}
+	t.Bold = true
+	target := t.Width - math.Min(t.FontSize*0.08, 1.2)
+	if target < t.FontSize*0.4 {
+		target = t.Width
+	}
+	fam, sz, tr := fitRun(t.FontName, true, t.Italic, t.FontSize, target, t.Content)
+	if fam != "" {
+		t.FontName = fam
+	}
+	if sz > 0.5 && math.Abs(sz-t.FontSize) > 0.05 {
+		t.Y += t.FontSize - sz
+		t.FontSize = sz
+	}
+	t.Tracking = tr
 }
 
 func glyphOutlineOfText(s *ShapeObject, texts []*TextObject) bool {

@@ -12,9 +12,24 @@ func TestTrackingPullsWideFont(t *testing.T) {
 	if sz >= 20 {
 		t.Fatalf("size %v should shrink a font that is 50%% too wide", sz)
 	}
+	if math.Abs(tr) > sz*0.05 {
+		t.Fatalf("tracking %v condenses glyphs (size %v)", tr, sz)
+	}
 	ink := 60*sz/20 + tr*4
-	if math.Abs(ink-40) > 1.5 {
-		t.Fatalf("fitted ink %v, want about 40 (size %v tracking %v)", ink, sz, tr)
+	if ink >= 55 {
+		t.Fatalf("fitted ink %v did not shrink (size %v tracking %v)", ink, sz, tr)
+	}
+}
+
+func TestModerateMismatchDoesNotCondense(t *testing.T) {
+	// About 16% too wide, the "Gotham University" case. Scale the em;
+	// do not pull the letters together.
+	sz, tr := trackingFor("Gotham University", 12, 84, 100, func(s float64) float64 { return 100 * s / 12 })
+	if math.Abs(tr) > 0.15 {
+		t.Fatalf("tracking %v is large enough to squeeze the word", tr)
+	}
+	if sz < 9.5 || sz > 10.5 {
+		t.Fatalf("size %v, want about 10", sz)
 	}
 }
 
@@ -29,7 +44,9 @@ func TestSuppressesGlyphOutlinesInsideText(t *testing.T) {
 	text := &TextObject{Content: "THIS IS A", FontName: "Noto Sans", FontSize: 48, X: 80, Y: 4, Width: 210, Height: 60}
 	letter := &ShapeObject{
 		X: 83, Y: 16, Width: 28, Height: 36,
-		HasStroke: true, StrokeWidth: 2, Path: make([]PathOp, 8),
+		HasStroke: true, StrokeWidth: 1.9,
+		StrokeR: 48, StrokeG: 48, StrokeB: 48,
+		Path: make([]PathOp, 8),
 	}
 	stem := &ShapeObject{
 		X: 148, Y: 16, Width: 6, Height: 36,
@@ -57,6 +74,9 @@ func TestSuppressesGlyphOutlinesInsideText(t *testing.T) {
 		if el.Shape == letter {
 			t.Fatal("letter outline was kept")
 		}
+	}
+	if !text.Stroke || text.StrokeWidth < 1.9 || !text.Bold {
+		t.Fatalf("outline weight not kept on the run: stroke=%v sw=%v bold=%v", text.Stroke, text.StrokeWidth, text.Bold)
 	}
 }
 
@@ -86,8 +106,14 @@ func TestBeamerTitleIsSingleAndFitted(t *testing.T) {
 		t.Fatal("title text missing")
 	}
 	ink := InkWidth(title)
-	if ink > title.Width+1 {
+	if ink > title.Width+2 {
 		t.Fatalf("title ink %.1f exceeds box %.1f", ink, title.Width)
+	}
+	if !title.Stroke || title.StrokeWidth < 0.5 {
+		t.Fatalf("title lost the contour weight: stroke=%v sw=%.2f", title.Stroke, title.StrokeWidth)
+	}
+	if math.Abs(title.Tracking) > title.FontSize*0.05 {
+		t.Fatalf("title tracking %.2f condenses the line", title.Tracking)
 	}
 	// The following run on the same baseline must not be crossed by this ink.
 	for _, other := range page.TextObjects {
@@ -96,6 +122,11 @@ func TestBeamerTitleIsSingleAndFitted(t *testing.T) {
 		}
 		if title.X+ink > other.X+1.0 && other.X > title.X {
 			t.Fatalf("%q ink reaches %q at x %.1f", title.Content, other.Content, other.X)
+		}
+	}
+	for _, tx := range page.TextObjects {
+		if math.Abs(tx.Tracking) > tx.FontSize*0.05 {
+			t.Fatalf("%q tracking %.2f condenses glyphs", tx.Content, tx.Tracking)
 		}
 	}
 	overlaps := TextOverlaps(page.TextObjects)

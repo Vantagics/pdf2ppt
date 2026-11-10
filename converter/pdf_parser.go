@@ -2,7 +2,7 @@ package converter
 
 import (
 	"fmt"
-	"pdf2ppt/converter/gopdf2"
+	"github.com/Vantagics/pdf2ppt/converter/gopdf2"
 	"strings"
 )
 

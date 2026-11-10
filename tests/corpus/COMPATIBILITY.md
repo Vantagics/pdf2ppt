@@ -1,5 +1,7 @@
 # Compatibility notes (v1.2.1)
 
+v1.3.0 makes the Beamer line "THIS IS A" bold again (the dropped contour was the weight; it is also a text outline) and stops condensing "Gotham University". Spacing is only a few percent of an em; a wider fallback is scaled instead. Gill Sans is drawn with Liberation Sans, which has a real italic. Side-by-side: the title page in the 1.3.0 artifacts.
+
 v1.2.1 fixes three things the v1.2.0 SSIM table did not show:
 
 - Beamer Flip page 1. The title "THIS IS A / SAMPLE / TALK TITLE" was a filled run plus a stroked copy of each letter. It is one run now. The face is still Noto Sans, not the embedded Trebuchet, so the letters are a little heavier and tighter than the source. SSIM on that page is about 0.81.

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"pdf2ppt/converter"
+	"github.com/Vantagics/pdf2ppt/converter"
 )
 
 func main() {

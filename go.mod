@@ -1,4 +1,4 @@
-module pdf2ppt
+module github.com/Vantagics/pdf2ppt
 
 go 1.22
 

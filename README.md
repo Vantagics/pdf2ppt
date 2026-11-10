@@ -1,6 +1,71 @@
+English | [简体中文](README.zh-CN.md)
+
 # pdf2ppt
 
 Converts a PDF into an editable PowerPoint file (`.pptx`). Each PDF page becomes one slide. Text stays in real text boxes (not a flattened picture of the page), pictures stay pictures, and vector drawings become shapes.
+
+## Agent skill
+
+The folder `skill/pdf2ppt` is an agent skill. A Cursor, Claude Code, or Codex agent that loads it can install the `pdf2ppt` command and convert a PDF into an editable PowerPoint file when you ask it to. The instructions the agent follows are in `skill/pdf2ppt/SKILL.md`.
+
+Install the skill by copying that folder into the skills directory your agent reads.
+
+Cursor, Linux or macOS:
+
+```bash
+mkdir -p ~/.cursor/skills
+cp -R skill/pdf2ppt ~/.cursor/skills/pdf2ppt
+```
+
+Cursor, this project only:
+
+```bash
+mkdir -p .cursor/skills
+cp -R skill/pdf2ppt .cursor/skills/pdf2ppt
+```
+
+Cursor, Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.cursor\skills" | Out-Null
+Copy-Item -Recurse -Force skill\pdf2ppt "$env:USERPROFILE\.cursor\skills\pdf2ppt"
+```
+
+Claude Code, Linux or macOS (user-wide, or `.claude/skills/` inside a project):
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R skill/pdf2ppt ~/.claude/skills/pdf2ppt
+```
+
+Claude Code, Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\skills" | Out-Null
+Copy-Item -Recurse -Force skill\pdf2ppt "$env:USERPROFILE\.claude\skills\pdf2ppt"
+```
+
+Codex and other agents that read `SKILL.md` use their own skills directory the same way. Copy `skill/pdf2ppt` into that directory so the path ends in `.../skills/pdf2ppt/SKILL.md`. If you only have a zip of this repository, download it from GitHub, unzip, and copy the `skill/pdf2ppt` folder from there.
+
+The skill needs the `pdf2ppt` binary. From a clone:
+
+```bash
+bash skill/pdf2ppt/scripts/install.sh
+pdf2ppt -v
+```
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File skill\pdf2ppt\scripts\install.ps1
+pdf2ppt -v
+```
+
+The script keeps an existing binary, otherwise builds this clone, otherwise runs `go install github.com/Vantagics/pdf2ppt/cmd/pdf2ppt@latest`, otherwise downloads `pdf2ppt_<os>_<arch>` from the latest GitHub Release. `go install` writes to `$(go env GOPATH)/bin`. Put that directory on `PATH` if `pdf2ppt -v` is not found.
+
+Start a new agent chat so it reloads skills. Ask, for example: `convert report.pdf to pptx`. The agent should run `pdf2ppt report.pdf report.pptx` and tell you where the file was written. If it answers without calling the tool, the skill folder is not on the path that agent reads.
+
+## How to run it
 
 There are two ways to run it:
 
@@ -12,7 +77,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.0.0
+pdf2ppt 1.3.0
 usage: pdf2ppt input.pdf output.pptx
 ```
 
@@ -39,7 +104,7 @@ A practical fidelity check is:
 3. Convert that PDF back with pdf2ppt.
 4. Compare the two PPTX files.
 
-On the fixtures in `tests/roundtrip`, that round trip keeps the slide count, the slide aspect ratio (within 1.5 pt), and the text (ignoring whitespace and bullet glyphs). Re-rendering both decks and comparing pixels with SSIM scores **0.998 or higher** on every slide. See the changelog for the before/after numbers.
+On the fixtures in `tests/roundtrip`, that round trip keeps the slide count, the slide aspect ratio (within 1.5 pt), and the text (ignoring whitespace and bullet glyphs). Re-rendering both decks and comparing pixels with SSIM scores **0.99 or higher** on every slide. See the changelog for the before/after numbers.
 
 The tests are `TestRoundTrip` in `converter/roundtrip_test.go`. They need:
 
@@ -89,5 +154,6 @@ converter/            conversion pipeline
 converter/gopdf2/     PDF content interpreter
 converter/goppt/      PPTX writer
 frontend/             Wails UI
+skill/pdf2ppt/        agent skill (SKILL.md and install scripts)
 tests/roundtrip/      fixture generator and SSIM comparison
 ```

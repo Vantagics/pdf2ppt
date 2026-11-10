@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
-	"pdf2ppt/converter"
+	"github.com/Vantagics/pdf2ppt/converter"
 	"runtime"
 	"strings"
 

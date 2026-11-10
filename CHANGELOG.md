@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+The Beamer line "THIS IS A" is regular text plus a heavy glyph contour. Dropping the contour left it thin next to the bold "SAMPLE". That contour is now a text outline, and the face is set bold because LibreOffice draws the outline faintly. "Gotham University" was condensed by large negative character spacing on a faux italic. Spacing is capped at a few percent of an em. A wider fallback is scaled uniformly, and Gill Sans is drawn with Liberation Sans, which has a real italic.
+
+`skill/pdf2ppt` is an agent skill for Cursor, Claude Code, and other SKILL.md agents. `scripts/install.sh` and `scripts/install.ps1` install the CLI. Release tags build linux, darwin, and windows binaries for amd64 and arm64.
+
 ## 1.2.1
 
 The Beamer title was not a heavier substitute font. xdvipdfmx paints those letters twice: a text run, then a stroked outline of each glyph, including a rectangular stem for "I". With Noto Sans in place of the embedded Trebuchet, the fill and the outline no longer sat on the same pixels, so the title looked ghosted. Those outlines are dropped when they sit inside the text run. Each run is then tracked (and, only for a large mismatch, resized) so the fallback font occupies the PDF advance instead of spilling into the next run. A TJ gap of exactly a quarter em, which xdvipdfmx uses as a word space, is a space again, so "You can now abuse fonts" is not one word. A wider gap is a second run, which keeps "155" and "8" in their own boxes. Vertical labels use a non-negative DrawingML angle; LibreOffice was ignoring the negative one and drawing them across the numbers.

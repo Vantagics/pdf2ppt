@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"pdf2ppt/converter/goppt"
+	"github.com/Vantagics/pdf2ppt/converter/goppt"
 )
 
 // PPTXGenerator PPTX 文件生成器

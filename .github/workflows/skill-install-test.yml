@@ -1,0 +1,67 @@
+name: Skill install
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unix:
+    name: install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Follow the README install block with no Go
+        run: |
+          set -eu
+          # Same commands as the "Install for agents" block in README.md.
+          # The script body is this commit (what raw GitHub serves for it).
+          if ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
+            if command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y curl ca-certificates tar
+            elif command -v apk >/dev/null 2>&1; then
+              sudo apk add --no-cache curl ca-certificates tar
+            else
+              echo "Install curl and tar, then run this script again." >&2
+              exit 1
+            fi
+          fi
+          sh -s -- --skill-dir "$HOME/.cursor/skills" < skill/pdf2ppt/scripts/install.sh
+          test -f "$HOME/.cursor/skills/pdf2ppt/SKILL.md"
+          test -x "$HOME/.local/bin/pdf2ppt"
+          "$HOME/.local/bin/pdf2ppt" -v
+          "$HOME/.local/bin/pdf2ppt" "$HOME/.cursor/skills/pdf2ppt/examples/sample.pdf" "$HOME/sample.pptx"
+          magic=$(od -An -N 2 -t x1 "$HOME/sample.pptx" | tr -d ' \n')
+          test "$magic" = "504b"
+          echo PPTX_OK
+
+  windows:
+    name: install (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Follow the README PowerShell install block
+        shell: pwsh
+        run: |
+          $dst = Join-Path $env:TEMP "pdf2ppt-install.ps1"
+          Copy-Item -Force skill/pdf2ppt/scripts/install.ps1 $dst
+          powershell -ExecutionPolicy Bypass -File $dst -SkillDir "$env:USERPROFILE\.cursor\skills"
+          if (-not (Test-Path "$env:USERPROFILE\.cursor\skills\pdf2ppt\SKILL.md")) { throw "SKILL.md missing" }
+          $bin = "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe"
+          & $bin -v
+          if ($LASTEXITCODE -ne 0) { throw "pdf2ppt -v failed" }
+          $sample = "$env:USERPROFILE\.cursor\skills\pdf2ppt\examples\sample.pdf"
+          $out = "$env:USERPROFILE\sample.pptx"
+          & $bin $sample $out
+          if ($LASTEXITCODE -ne 0) { throw "convert failed" }
+          $bytes = [System.IO.File]::ReadAllBytes($out)
+          if ($bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4b) { throw "output is not a zip/pptx" }
+          Write-Host "PPTX_OK"

@@ -14,67 +14,64 @@ The converter is the `pdf2ppt` command from [github.com/Vantagics/pdf2ppt](https
 
 ## Check whether it is installed
 
-```bash
-command -v pdf2ppt && pdf2ppt -v
-```
-
-On Windows PowerShell:
-
-```powershell
-Get-Command pdf2ppt -ErrorAction SilentlyContinue
-pdf2ppt -v
-```
-
-If the command is missing, install it with the script below. A version printed on stderr or stdout means the binary runs.
-
-`go install` puts the binary in `$(go env GOPATH)/bin` (often `~/go/bin`). If `pdf2ppt -v` fails after install, add that directory to `PATH`.
-
-## Install
-
-From a clone of this repository the script builds the local module. Otherwise it runs `go install github.com/Vantagics/pdf2ppt/cmd/pdf2ppt@latest`. If Go is not available it downloads the matching binary from the latest GitHub Release.
+Do not assume `pdf2ppt` is on `PATH`. Use the absolute path the installer prints (`PDF2PPT_BIN=`).
 
 Linux or macOS:
 
 ```bash
-bash skill/pdf2ppt/scripts/install.sh
-```
-
-When this folder has been copied into an agent skills directory:
-
-```bash
-bash ~/.cursor/skills/pdf2ppt/scripts/install.sh
+test -x "$HOME/.local/bin/pdf2ppt" && "$HOME/.local/bin/pdf2ppt" -v
+test -f "$HOME/.cursor/skills/pdf2ppt/SKILL.md" && echo SKILL_OK
 ```
 
 Windows PowerShell:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File skill/pdf2ppt/scripts/install.ps1
+Test-Path "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe"
+& "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe" -v
+Test-Path "$env:USERPROFILE\.cursor\skills\pdf2ppt\SKILL.md"
 ```
 
-Install by hand if you prefer:
+A version number means the binary runs. `SKILL_OK` or `True` means the skill file is in place.
+
+## Install
+
+Follow the "Install for agents" section in the repository README (English: `README.md`, Chinese: `README.zh-CN.md`). Those blocks are complete. They download this skill and a release binary, and they check the SHA256 checksum. They do not need Go or git.
+
+If this skill is already on disk, the same installer is:
 
 ```bash
-go install github.com/Vantagics/pdf2ppt/cmd/pdf2ppt@latest
+sh "$HOME/.cursor/skills/pdf2ppt/scripts/install.sh" --skill-dir "$HOME/.cursor/skills"
 ```
 
-Release archives are named `pdf2ppt_<os>_<arch>` (`linux`, `darwin`, `windows` and `amd64`, `arm64`). Windows builds end in `.exe`. The checksum file on the release is `SHA256SUMS`.
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.cursor\skills\pdf2ppt\scripts\install.ps1" -SkillDir "$env:USERPROFILE\.cursor\skills"
+```
 
 ## Convert
 
-One file:
+Use the absolute binary. Replace the two paths if the user named different files.
+
+Linux or macOS:
 
 ```bash
-pdf2ppt report.pdf report.pptx
+"$HOME/.local/bin/pdf2ppt" report.pdf report.pptx
 ```
 
-Or the helper, which also accepts a directory:
+Windows PowerShell:
+
+```powershell
+& "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe" report.pdf report.pptx
+```
+
+A directory of PDFs (Linux or macOS):
 
 ```bash
-bash skill/pdf2ppt/scripts/convert.sh report.pdf
-bash skill/pdf2ppt/scripts/convert.sh ./decks ./decks-pptx
+sh "$HOME/.cursor/skills/pdf2ppt/scripts/convert.sh" ./decks ./decks-pptx
 ```
 
-A directory of PDFs writes one `.pptx` per file into the output directory (default: `./pptx-out` next to the current directory). The command prints `wrote <path> (N slides)` and page progress on stderr. Exit code 0 means the file was written. A non-PDF, a missing path, or a PDF that needs a user password exits non-zero and prints the reason.
+The command prints `wrote <path> (N slides)`. Exit code 0 means the file was written. The output is a zip; the first two bytes are `PK`. A non-PDF, a missing path, or a PDF that needs a user password exits non-zero and prints the reason.
 
 The desktop window (`wails build`) is optional. Agents should use the CLI.
 
@@ -102,8 +99,8 @@ Open `/tmp/report-slide-1.png`. Text should be selectable in Impress or PowerPoi
 
 | Symptom | What to do |
 | --- | --- |
-| `pdf2ppt: command not found` after `go install` | Add `$(go env GOPATH)/bin` to `PATH` and open a new shell. |
-| `go: module github.com/Vantagics/pdf2ppt` cannot be downloaded | Use the release binary. The install script does that when `go install` fails. |
+| `pdf2ppt: command not found` | Do not rely on PATH. Run `"$HOME/.local/bin/pdf2ppt"` or `& "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe"`. |
+| SHA256 mismatch | The download was corrupt. Run the README install block again. Do not execute the rejected file. |
 | `不是有效的 PDF 格式` or "not a valid PDF" | The input is not a PDF, or it is truncated. `pdfinfo input.pdf` should print a page count. |
 | Conversion succeeds but the slide looks like the wrong font | Install the family named in the PDF, or accept the substitute. The tool does not embed fonts. |
 | LibreOffice will not open the file | `unzip -t` the pptx. If that fails, the write was interrupted. Convert again. |

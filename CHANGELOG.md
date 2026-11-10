@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+The skill install no longer needs Go or git. `install.sh` / `install.ps1` download the release binary, check `SHA256SUMS`, and put it in `~/.local/bin` or `%LOCALAPPDATA%\pdf2ppt`. The same command downloads the skill folder. README.md and README.zh-CN.md start with a block an agent can paste. Releases also attach `pdf2ppt-skill.tar.gz` and `pdf2ppt-skill.zip`.
+
 ## 1.3.0
 
 The Beamer line "THIS IS A" is regular text plus a heavy glyph contour. Dropping the contour left it thin next to the bold "SAMPLE". That contour is now a text outline, and the face is set bold because LibreOffice draws the outline faintly. "Gotham University" was condensed by large negative character spacing on a faux italic. Spacing is capped at a few percent of an em. A wider fallback is scaled uniformly, and Gill Sans is drawn with Liberation Sans, which has a real italic.

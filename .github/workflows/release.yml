@@ -18,7 +18,7 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Cross-compile the CLI
+      - name: Cross-compile the CLI and pack the skill
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -34,8 +34,10 @@ jobs:
             CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
               go build -trimpath -ldflags "-s -w" -o "dist/$name" ./cmd/pdf2ppt
           done
+          tar -C skill -czf dist/pdf2ppt-skill.tar.gz pdf2ppt
+          python3 -c 'import zipfile; from pathlib import Path; root=Path("skill/pdf2ppt"); out=Path("dist/pdf2ppt-skill.zip"); z=zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED); [z.write(p, Path("pdf2ppt")/p.relative_to(root)) for p in root.rglob("*") if p.is_file()]; z.close(); print(out, out.stat().st_size)'
           cd dist
-          sha256sum pdf2ppt_* > SHA256SUMS
+          sha256sum pdf2ppt_* pdf2ppt-skill.tar.gz pdf2ppt-skill.zip > SHA256SUMS
           ls -l
 
       - name: Attach binaries to the GitHub Release
@@ -44,11 +46,10 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
+          notes="CLI binaries for linux, darwin, and windows (amd64 and arm64), plus pdf2ppt-skill.tar.gz and pdf2ppt-skill.zip. See CHANGELOG.md."
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" dist/* --clobber
           else
-            gh release create "$tag" dist/* \
-              --title "$tag" \
-              --notes "CLI binaries for linux, darwin, and windows (amd64 and arm64). See CHANGELOG.md."
+            gh release create "$tag" dist/* --title "$tag" --notes "$notes"
           fi
           gh release view "$tag" --json assets --jq '.assets[].name'

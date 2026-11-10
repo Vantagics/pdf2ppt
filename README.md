@@ -4,66 +4,69 @@ English | [简体中文](README.zh-CN.md)
 
 Converts a PDF into an editable PowerPoint file (`.pptx`). Each PDF page becomes one slide. Text stays in real text boxes (not a flattened picture of the page), pictures stay pictures, and vector drawings become shapes.
 
-## Agent skill
+## Install for agents
 
-The folder `skill/pdf2ppt` is an agent skill. A Cursor, Claude Code, or Codex agent that loads it can install the `pdf2ppt` command and convert a PDF into an editable PowerPoint file when you ask it to. The instructions the agent follows are in `skill/pdf2ppt/SKILL.md`.
+This block is the whole install. It does not need git, Go, or a clone of this repository. Pick the block that matches the machine. Do not edit the URLs.
 
-Install the skill by copying that folder into the skills directory your agent reads.
+How to choose: if `uname -s` prints `Linux` or `Darwin`, use the Linux/macOS block. If PowerShell's `$env:OS` is `Windows_NT`, use the Windows block.
 
-Cursor, Linux or macOS:
-
-```bash
-mkdir -p ~/.cursor/skills
-cp -R skill/pdf2ppt ~/.cursor/skills/pdf2ppt
-```
-
-Cursor, this project only:
+### Linux and macOS (Cursor)
 
 ```bash
-mkdir -p .cursor/skills
-cp -R skill/pdf2ppt .cursor/skills/pdf2ppt
+#!/bin/sh
+set -eu
+if ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update
+    apt-get install -y curl ca-certificates tar
+  elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache curl ca-certificates tar
+  else
+    echo "Install curl and tar, then run this script again." >&2
+    exit 1
+  fi
+fi
+curl -fsSL https://raw.githubusercontent.com/Vantagics/pdf2ppt/main/skill/pdf2ppt/scripts/install.sh | sh -s -- --skill-dir "$HOME/.cursor/skills"
+test -f "$HOME/.cursor/skills/pdf2ppt/SKILL.md"
+test -x "$HOME/.local/bin/pdf2ppt"
+"$HOME/.local/bin/pdf2ppt" -v
+"$HOME/.local/bin/pdf2ppt" "$HOME/.cursor/skills/pdf2ppt/examples/sample.pdf" "$HOME/sample.pptx"
+magic=$(od -An -N 2 -t x1 "$HOME/sample.pptx" | tr -d ' \n')
+test "$magic" = "504b"
+echo PPTX_OK
 ```
 
-Cursor, Windows PowerShell:
+`apt-get` / `apk` need to run as root (a container usually is root). If curl and tar are already installed, that step is skipped. The installer downloads the latest GitHub Release binary, checks it against `SHA256SUMS`, and writes it to `$HOME/.local/bin/pdf2ppt`. It also downloads the skill folder. You do not need to put that directory on `PATH`. Run `"$HOME/.local/bin/pdf2ppt"`.
+
+Success looks like this: the script prints `PDF2PPT_BIN=` and `SKILL_MD=`, `pdf2ppt -v` prints a version number, and the last line is `PPTX_OK`.
+
+If it fails: a checksum mismatch stops before the binary is installed (delete nothing by hand; run the block again). A 404 means this OS/CPU is not in the release; the script prints the asset name (`pdf2ppt_linux_amd64`, `pdf2ppt_linux_arm64`, `pdf2ppt_darwin_amd64`, or `pdf2ppt_darwin_arm64`). `SKILL.md missing` means the download of the skill archive failed; run the block again.
+
+Claude Code uses the same block with this one difference: `--skill-dir "$HOME/.claude/skills"`, and the `test -f` path becomes `$HOME/.claude/skills/pdf2ppt/SKILL.md`. Codex uses `--skill-dir "$HOME/.codex/skills"`. Any other SKILL.md agent: set `--skill-dir` to the directory that should contain a `pdf2ppt` folder. A project-only install uses `--skill-dir "$PWD/.cursor/skills"` or `--skill-dir "$PWD/.claude/skills"`.
+
+### Windows (Cursor)
 
 ```powershell
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.cursor\skills" | Out-Null
-Copy-Item -Recurse -Force skill\pdf2ppt "$env:USERPROFILE\.cursor\skills\pdf2ppt"
+$ErrorActionPreference = "Stop"
+$dst = Join-Path $env:TEMP "pdf2ppt-install.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Vantagics/pdf2ppt/main/skill/pdf2ppt/scripts/install.ps1" -OutFile $dst
+powershell -ExecutionPolicy Bypass -File $dst -SkillDir "$env:USERPROFILE\.cursor\skills"
+if (-not (Test-Path "$env:USERPROFILE\.cursor\skills\pdf2ppt\SKILL.md")) { throw "SKILL.md missing" }
+$bin = "$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe"
+& $bin -v
+if ($LASTEXITCODE -ne 0) { throw "pdf2ppt -v failed" }
+& $bin "$env:USERPROFILE\.cursor\skills\pdf2ppt\examples\sample.pdf" "$env:USERPROFILE\sample.pptx"
+if ($LASTEXITCODE -ne 0) { throw "convert failed" }
+$bytes = [System.IO.File]::ReadAllBytes("$env:USERPROFILE\sample.pptx")
+if ($bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4b) { throw "output is not a pptx" }
+Write-Host "PPTX_OK"
 ```
 
-Claude Code, Linux or macOS (user-wide, or `.claude/skills/` inside a project):
+The binary is `$env:LOCALAPPDATA\pdf2ppt\pdf2ppt.exe`. PATH is not required. Claude Code: change both `\.cursor\skills` paths to `\.claude\skills`. Codex: `\.codex\skills`.
 
-```bash
-mkdir -p ~/.claude/skills
-cp -R skill/pdf2ppt ~/.claude/skills/pdf2ppt
-```
+Success: the script prints `PDF2PPT_BIN=`, `-v` prints a version, and the last line is `PPTX_OK`. On failure, re-run the block. A checksum mismatch does not leave a partial binary in place of a good one.
 
-Claude Code, Windows PowerShell:
-
-```powershell
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\skills" | Out-Null
-Copy-Item -Recurse -Force skill\pdf2ppt "$env:USERPROFILE\.claude\skills\pdf2ppt"
-```
-
-Codex and other agents that read `SKILL.md` use their own skills directory the same way. Copy `skill/pdf2ppt` into that directory so the path ends in `.../skills/pdf2ppt/SKILL.md`. If you only have a zip of this repository, download it from GitHub, unzip, and copy the `skill/pdf2ppt` folder from there.
-
-The skill needs the `pdf2ppt` binary. From a clone:
-
-```bash
-bash skill/pdf2ppt/scripts/install.sh
-pdf2ppt -v
-```
-
-Windows PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File skill\pdf2ppt\scripts\install.ps1
-pdf2ppt -v
-```
-
-The script keeps an existing binary, otherwise builds this clone, otherwise runs `go install github.com/Vantagics/pdf2ppt/cmd/pdf2ppt@latest`, otherwise downloads `pdf2ppt_<os>_<arch>` from the latest GitHub Release. `go install` writes to `$(go env GOPATH)/bin`. Put that directory on `PATH` if `pdf2ppt -v` is not found.
-
-Start a new agent chat so it reloads skills. Ask, for example: `convert report.pdf to pptx`. The agent should run `pdf2ppt report.pdf report.pptx` and tell you where the file was written. If it answers without calling the tool, the skill folder is not on the path that agent reads.
+After either block, a new agent chat can be asked: `convert report.pdf to pptx`. It should run the absolute binary path above on `report.pdf` and write `report.pptx` next to it (or any path you name). If the agent never runs the command, the skill folder is not the directory that agent reads.
 
 ## How to run it
 
@@ -77,7 +80,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.3.0
+pdf2ppt 1.3.1
 usage: pdf2ppt input.pdf output.pptx
 ```
 

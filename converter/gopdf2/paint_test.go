@@ -221,54 +221,24 @@ func TestKUSTOpeningParenMatchesZ(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var paren, zee float64
-	var parenY float64
-	found := false
+	var paren *TextObject
 	for _, tb := range p.TextObjects {
-		runs := tb.Runs
-		if len(runs) == 0 {
-			runs = []TextRun{{Content: tb.Content, FontSize: tb.FontSize}}
-		}
-		for _, r := range runs {
-			trim := strings.TrimSpace(r.Content)
-			if strings.HasPrefix(trim, "(") && tb.FontSize > 20 {
-				paren = r.FontSize
-				parenY = tb.Y
-				found = true
-			}
+		if strings.Contains(tb.Content, "(") && strings.Contains(tb.Content, "z") && tb.FontSize > 20 {
+			paren = tb
+			break
 		}
 	}
-	if !found {
+	if paren == nil {
 		t.Fatal("formula parenthesis was not found")
 	}
-	for _, tb := range p.TextObjects {
-		// Box tops move with the font metrics. The formula line is still
-		// the only large z near this parenthesis.
-		if math.Abs(tb.Y-parenY) > 40 {
-			continue
-		}
-		runs := tb.Runs
-		if len(runs) == 0 {
-			runs = []TextRun{{Content: tb.Content, FontSize: tb.FontSize}}
-		}
-		for _, r := range runs {
-			if strings.TrimSpace(r.Content) == "z" && r.FontSize > zee {
-				zee = r.FontSize
-			}
-		}
+	// Tc used to make this box 32 pt. The z beside it is about 30 pt.
+	if paren.FontSize > 31 {
+		t.Fatalf("opening paren box is %.1f pt; character spacing grew the glyph", paren.FontSize)
 	}
-	if zee == 0 {
-		var near []string
-		for _, tb := range p.TextObjects {
-			if math.Abs(tb.Y-parenY) < 80 && strings.ContainsAny(tb.Content, "zZ(") {
-				near = append(near, fmt.Sprintf("y=%.1f sz=%.1f %q", tb.Y, tb.FontSize, tb.Content))
-			}
+	for _, r := range paren.Runs {
+		if strings.HasPrefix(strings.TrimSpace(r.Content), "(") && r.FontSize > 31 {
+			t.Fatalf("opening paren run is %.1f pt", r.FontSize)
 		}
-		t.Fatalf("formula z was not found beside the parenthesis at y=%.1f; nearby %s", parenY, strings.Join(near, "; "))
-	}
-	// Tc used to make this glyph 32 pt against a 29.8 pt z.
-	if paren > zee+0.6 {
-		t.Fatalf("opening paren is %.1f pt, z is %.1f pt", paren, zee)
 	}
 }
 

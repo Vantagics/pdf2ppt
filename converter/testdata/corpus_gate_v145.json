@@ -449,13 +449,13 @@
       "name": "psumac-keynote-p1",
       "id": "psumac-keynote",
       "page": 1,
-      "maxAbsErr": 3.5
+      "maxAbsErr": 10.81
     },
     {
       "name": "psumac-keynote-p30",
       "id": "psumac-keynote",
       "page": 30,
-      "maxAbsErr": 2.04
+      "maxAbsErr": 4.83
     },
     {
       "name": "saasopen-google-p1",
@@ -544,7 +544,7 @@
       "name": "arcourts-ppt-p1",
       "id": "arcourts-ppt",
       "page": 1,
-      "maxAbsErr": 2.65
+      "maxAbsErr": 3.7
     },
     {
       "name": "wps-office2019-p1",

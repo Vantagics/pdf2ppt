@@ -105,7 +105,10 @@ func fitCloudFontSpacing(p *Page) {
 			continue
 		}
 		gaps := utf8.RuneCountInString(t.Content) - 1
-		if gaps < 1 || math.Abs(measured-t.Width)/t.Width < 0.015 {
+		// A narrower face already fits. Stretching it to the padded box
+		// pushes the last letter into the next word. Only a face that is
+		// wider than the PDF box is pulled in.
+		if gaps < 1 || measured <= t.Width*1.015 {
 			t.Tracking = 0
 			continue
 		}

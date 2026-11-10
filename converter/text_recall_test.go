@@ -59,7 +59,13 @@ func TestTextRecall(t *testing.T) {
 // TestTextRecallBaseline fails when unique-token recall drops more than 0.3
 // percentage points from the stored value. a:t is concatenated with no
 // inserted spaces, matching the corpus score. Tokens are NFKC Latin/digit
-// words plus one token per CJK, kana, or hangul rune.
+// words of at least two characters, plus one token per CJK, kana, or hangul
+// rune.
+//
+// The v1.4.8 KUST drop (ρg glued to ②, which NFKC turns into "ρg2") did not
+// fail this test. The baseline was recorded from that same build, and
+// pdftotext writes the source as "ρ g", so "ρg" is not a source token.
+// TestKUSTOpeningParenMatchesZ checks that boundary directly.
 func TestRecordRecallBaseline(t *testing.T) {
 	if os.Getenv("PDF2PPT_RECORD_BASELINE") != "1" {
 		t.Skip("set PDF2PPT_RECORD_BASELINE=1 to rewrite recall")
@@ -93,7 +99,7 @@ func TestRecordRecallBaseline(t *testing.T) {
 		Note   string             `json:"note"`
 		Recall map[string]float64 `json:"recall"`
 	}{
-		Source: "v1.4.8",
+		Source: "v1.4.9",
 		Note:   "Unique-token recall of concatenated a:t against pdftotext. A later build fails if a deck drops more than 0.3 percentage points.",
 		Recall: recall,
 	}

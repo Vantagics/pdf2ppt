@@ -216,6 +216,19 @@ func TestEquationLetterSubscriptStays(t *testing.T) {
 	}
 }
 
+func TestSubscriptReplacesTheHoleSpace(t *testing.T) {
+	// "2.n .d" has a space where h is drawn. The subscript replaces that space.
+	body := &TextObject{Content: "2.n .d ", FontName: "Noto Sans", FontSize: 11, X: 0, Y: 0, Width: 70, Height: 12}
+	sub := &TextObject{Content: "h", FontName: "Noto Sans", FontSize: 7.3, X: 40, Y: 4, Width: 4, Height: 8}
+	insertSubscript(body, sub)
+	if strings.Contains(body.Content, " ") && strings.Contains(body.Content, "n ") {
+		t.Fatalf("hole space kept: %q", body.Content)
+	}
+	if !strings.Contains(body.Content, "nh") {
+		t.Fatalf("subscript not inline: %q", body.Content)
+	}
+}
+
 func TestKUSTOpeningParenMatchesZ(t *testing.T) {
 	pdf := corpusFile("kust-pressure")
 	if pdf == "" {
@@ -278,6 +291,68 @@ func TestKUSTOpeningParenMatchesZ(t *testing.T) {
 		}
 		if tb.X < paren.X+paren.Width-0.8 && paren.X < tb.X+tb.Width-0.8 {
 			t.Fatalf("z box [%.1f, %.1f] %q overlaps the ( box [%.1f, %.1f]", tb.X, tb.X+tb.Width, tb.Content, paren.X, paren.X+paren.Width)
+		}
+	}
+	var formula *TextObject
+	for _, tb := range p.TextObjects {
+		if tb.FontSize > 20 && strings.Contains(tb.Content, "ρg") {
+			formula = tb
+			break
+		}
+	}
+	if formula == nil {
+		t.Fatal("ρg box was not found")
+	}
+	// The parenthesis starts where the Times ink of ρg ends.
+	if math.Abs(paren.X-(formula.X+formula.Width)) > 1.5 {
+		t.Fatalf("paren x %.1f, ρg ink ends at %.1f (%q)", paren.X, formula.X+formula.Width, formula.Content)
+	}
+	// A trailing space keeps "ρg" from gluing to the next a:t (② → 2).
+	var b strings.Builder
+	for _, tb := range p.TextObjects {
+		b.WriteString(tb.Content)
+	}
+	s := b.String()
+	i := strings.Index(s, "ρg")
+	if i < 0 || i+len("ρg") >= len(s) || s[i+len("ρg")] != ' ' {
+		t.Fatalf("ρg is glued to the next word: %q", s[max(0, i):min(len(s), i+len("ρg")+6)])
+	}
+}
+
+func TestNeuripsSubscriptsStayInline(t *testing.T) {
+	pdf := corpusFile("neurips-effxfmr")
+	if pdf == "" {
+		pdf = corpusFile("neurips")
+	}
+	if pdf == "" {
+		t.Skip("neurips pdf not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Pages 42 and 45. The subscript h sits in the paragraph, with no space
+	// where the PDF left a hole for it.
+	for _, page := range []int{41, 44} {
+		p, err := doc.GetPage(page)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, tb := range p.TextObjects {
+			if !strings.Contains(tb.Content, "2.n") {
+				continue
+			}
+			found = true
+			if strings.Contains(tb.Content, "n ") || strings.Contains(tb.Content, " h") || strings.Contains(tb.Content, "d ") || strings.Contains(tb.Content, " g") {
+				t.Fatalf("page %d subscript padding: %q", page+1, tb.Content)
+			}
+			if !strings.Contains(tb.Content, "nh") && !strings.Contains(tb.Content, "ng") {
+				t.Fatalf("page %d subscript not inline: %q", page+1, tb.Content)
+			}
+		}
+		if !found {
+			t.Fatalf("page %d formula was not found", page+1)
 		}
 	}
 }

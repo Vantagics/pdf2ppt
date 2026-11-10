@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.4.9
+
+KUST page 4 draws `ρg(z₁ − z₂)` with the parenthesis against the ink of `g`, and a trailing space so `ρg` does not glue to the next word. NeurIPS subscripts on pages 41, 42, and 45 stay inline, without the hole space. `tsmc-2q25-zh` was not remeasured (Cloudflare 403, no Wayback copy).
+
 ## v1.4.8
 
 KUST page 4 draws `(` in its own box, ending where `z₁` starts, so the parenthesis is not painted on `z₁`. Equation letters at 22 pt or below are subscripts again. Canva Rotary titles are unchanged from v1.4.7. `TestTextRecallBaseline` fails if unique-token recall drops more than 0.3 percentage points. `tsmc-2q25-zh` was not remeasured.

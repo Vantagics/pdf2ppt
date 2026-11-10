@@ -546,6 +546,147 @@ func splitRunAround(p *Page, a, b *TextObject) bool {
 	return true
 }
 
+// closeSubscriptHoles drops a space that survived after a subscript.
+// The subscript already occupies that gap, so the space was a second one.
+func closeSubscriptHoles(p *Page) {
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t == nil || len(t.Runs) < 2 {
+			continue
+		}
+		next := make([]TextRun, 0, len(t.Runs))
+		changed := false
+		for i, r := range t.Runs {
+			if r.Baseline < -1000 {
+				trimmed := strings.TrimRight(r.Content, " ")
+				if trimmed != r.Content && trimmed != "" {
+					nextSpace := i+1 < len(t.Runs) && strings.HasPrefix(t.Runs[i+1].Content, " ")
+					if !nextSpace {
+						trimmed += " "
+					}
+					if trimmed != r.Content {
+						changed = true
+						r.Content = trimmed
+					}
+				}
+			}
+			if i > 0 && t.Runs[i-1].Baseline < -1000 {
+				rs := []rune(r.Content)
+				spaces := 0
+				for spaces < len(rs) && unicode.IsSpace(rs[spaces]) {
+					spaces++
+				}
+				rest := string(rs[spaces:])
+				if rest == "" && i+1 < len(t.Runs) {
+					rest = strings.TrimLeft(t.Runs[i+1].Content, " ")
+				}
+				word := rest != "" && unicode.IsLetter([]rune(rest)[0])
+				if !word && spaces > 0 && strings.TrimSpace(r.Content) == "" {
+					changed = true
+					continue
+				}
+				if !word && spaces > 1 {
+					changed = true
+					r.Content = " " + string([]rune(r.Content)[spaces:])
+				}
+			}
+			if r.Content == "" {
+				changed = true
+				continue
+			}
+			next = append(next, r)
+		}
+		if !changed {
+			continue
+		}
+		t.Runs = next
+		t.Content = joinRunContent(t.Runs)
+	}
+}
+
+// tightenHeldFences pulls a parenthesis that was uncovered from a gap back
+// to the ink of the preceding word. The PDF box is a little wider than the
+// Times advance, which left "ρg (z" loose.
+func tightenHeldFences(p *Page) {
+	var texts []*TextObject
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t != nil && horizontal(t.Rotation) && t.Content != "" {
+			texts = append(texts, t)
+		}
+	}
+	for _, fence := range texts {
+		if !fence.holdX {
+			continue
+		}
+		var pred *TextObject
+		for _, t := range texts {
+			if t == fence || t.X >= fence.X-0.2 || !sameLine(t, fence) {
+				continue
+			}
+			if pred == nil || t.X > pred.X {
+				pred = t
+			}
+		}
+		if pred == nil {
+			continue
+		}
+		ink := objectInk(pred)
+		if ink < 0.5 {
+			continue
+		}
+		inkEnd := pred.X + ink
+		gap := fence.X - inkEnd
+		if gap < 0.6 || gap > 8 {
+			continue
+		}
+		oldRight := fence.X + fence.Width
+		pred.Width = ink
+		fence.X -= gap
+		// The hole space was removed when the run was split, so "ρg" is now
+		// the end of this box and glues to the next a:t. Put the boundary
+		// back. It is past the ink, so the parenthesis still starts at g.
+		if !strings.HasSuffix(pred.Content, " ") {
+			pred.Content += " "
+			if n := len(pred.Runs); n > 0 {
+				pred.Runs[n-1].Content += " "
+			}
+		}
+		for _, t := range texts {
+			if t == fence || t == pred || !sameLine(t, fence) {
+				continue
+			}
+			if math.Abs(t.X-oldRight) <= 1.2 {
+				t.X -= gap
+			}
+		}
+	}
+}
+
+// objectInk is the Times advance of the box, ignoring a trailing space that
+// exists only so the next a:t does not glue to this one.
+func objectInk(t *TextObject) float64 {
+	runs := t.Runs
+	if len(runs) == 0 {
+		runs = []TextRun{{
+			Content: t.Content, FontName: t.FontName, FontSize: t.FontSize,
+			Bold: t.Bold, Italic: t.Italic,
+		}}
+	}
+	var sum float64
+	for i, r := range runs {
+		text := r.Content
+		if i == len(runs)-1 {
+			text = strings.TrimRight(text, " ")
+		}
+		if text == "" || r.FontSize < 0.5 {
+			continue
+		}
+		sum += timesWidth(r.FontSize, text)
+	}
+	return sum
+}
+
 func joinRunContent(runs []TextRun) string {
 	var b strings.Builder
 	for _, r := range runs {
@@ -686,7 +827,7 @@ func insertSubscript(body, sub *TextObject) {
 	if total < 1 || body.Width < 0.5 {
 		return
 	}
-	// Put the digit after the glyph whose right edge is nearest the digit.
+	// Put the subscript after the glyph whose right edge is nearest it.
 	at := 1
 	bestDist := math.MaxFloat64
 	for k := 1; k <= total; k++ {
@@ -711,31 +852,56 @@ func insertSubscript(body, sub *TextObject) {
 		ColorR: sub.ColorR, ColorG: sub.ColorG, ColorB: sub.ColorB,
 		Baseline: pct,
 	}
+	flat := make([]rune, 0, total)
+	for _, r := range runs {
+		flat = append(flat, []rune(r.Content)...)
+	}
+	// A space just before the subscript is the hole it was painted in when
+	// the next glyph is punctuation ("n .d" → nₕ.d). A space before a word
+	// ("of 7") stays.
+	hole := -1
+	if at > 0 && at <= len(flat) && unicode.IsSpace(flat[at-1]) {
+		nextLetter := at < len(flat) && unicode.IsLetter(flat[at])
+		if !nextLetter {
+			hole = at - 1
+		}
+	}
 	var next []TextRun
+	var pending strings.Builder
+	var pendingRun TextRun
+	havePending := false
+	flush := func() {
+		if !havePending || pending.Len() == 0 {
+			pending.Reset()
+			havePending = false
+			return
+		}
+		pendingRun.Content = pending.String()
+		next = append(next, pendingRun)
+		pending.Reset()
+		havePending = false
+	}
 	seen := 0
 	inserted := false
 	for _, r := range runs {
-		n := utf8.RuneCountInString(r.Content)
-		if inserted || seen+n < at {
-			next = append(next, r)
-			seen += n
-			continue
+		for _, ch := range r.Content {
+			if seen == hole {
+				seen++
+				continue
+			}
+			if !inserted && seen == at {
+				flush()
+				next = append(next, subRun)
+				inserted = true
+			}
+			if !havePending {
+				pendingRun = r
+				havePending = true
+			}
+			pending.WriteRune(ch)
+			seen++
 		}
-		cut := at - seen
-		rs := []rune(r.Content)
-		if cut > 0 {
-			left := r
-			left.Content = string(rs[:cut])
-			next = append(next, left)
-		}
-		next = append(next, subRun)
-		if cut < len(rs) {
-			right := r
-			right.Content = string(rs[cut:])
-			next = append(next, right)
-		}
-		inserted = true
-		seen += n
+		flush()
 	}
 	if !inserted {
 		next = append(next, subRun)

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.9
+
+KUST page 4 still read `ρg (z₁ − z₂)`, a little open, and the split left `ρg` at the end of its box so it glued to the next word (`ρg②`, which is `ρg2` after NFKC). The parenthesis now starts where the Times ink of `ρg` ends, and that box keeps a trailing space so the token stays `ρg`. The boxes still do not overlap.
+
+NeurIPS pages 42 and 45 drew `2.n_h.d_h.l` as `2.n h.d h.l`. The space was the hole the subscript was painted in; the subscript run now replaces that space, so the letters stay in one paragraph. Page 41's `n_h` and `d_h` definitions use the same rule. A space before a word, such as `of 7` and `which controls`, stays.
+
+`TestTextRecallBaseline` did not catch the KUST 0.39 point drop: its baseline was stored from the v1.4.8 build that already glued `ρg`, and pdftotext's source token is `ρ g` rather than `ρg`. The parenthesis test now requires the boundary.
+
+`tsmc-2q25-zh` is still a Cloudflare challenge with a browser user agent, and the Wayback copy is a 404, so the `2025TSMC` merge was not remeasured.
+
 ## 1.4.8
 
 PowerPoint draws each text box from its own x. On KUST page 4 the opening "(" was its own box at 483.9 pt, sitting inside the run that still contained z₁, so the parenthesis was painted on top of z₁. Shrinking the glyph did not move that box. The run is split at the gap the parenthesis occupies, and that parenthesis is not merged back. The boxes are now `p₂ = p₁ + ρg` ending at 483.0 pt, `(` from 483.9 to 495.0 pt, and `z₁ − z₂ )` starting at 495.0 pt. They do not overlap. `TestKUSTOpeningParenMatchesZ` checks that geometry.

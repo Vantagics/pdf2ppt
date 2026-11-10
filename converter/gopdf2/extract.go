@@ -78,6 +78,8 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	uncoverOverlaidGlyphs(page)
 	mergeTextLines(page)
 	attachSubscripts(page)
+	closeSubscriptHoles(page)
+	tightenHeldFences(page)
 	pullBackOverlaps(page)
 	replaceIsolatedSymbols(page)
 	coalesceGlyphShapes(page)

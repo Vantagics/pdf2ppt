@@ -170,6 +170,69 @@ func fontNamesClose(want, got string) bool {
 	return strings.Contains(g, w) || strings.Contains(w, g)
 }
 
+// timesWidth estimates a Times-compatible advance in points. PowerPoint
+// draws the KUST formula with Times New Roman. Tinos uses the same widths,
+// and fc-match is not there on the Windows build, so the fence nudge uses
+// this table instead of a local font file.
+func timesWidth(size float64, text string) float64 {
+	if size <= 0 || text == "" {
+		return 0
+	}
+	var units float64
+	for _, r := range text {
+		units += float64(timesUnit(r))
+	}
+	return units / 1000 * size
+}
+
+func timesUnit(r rune) int {
+	switch r {
+	case 'ρ':
+		return 499
+	case '−', '+':
+		return 563
+	case '–':
+		return 500
+	case '—':
+		return 1000
+	case '×':
+		return 563
+	case '·':
+		return 333
+	case '’':
+		return 333
+	case '“', '”':
+		return 443
+	}
+	if r >= 32 && r <= 126 {
+		return timesASCII[r-32]
+	}
+	return 500
+}
+
+// timesASCII is the Tinos advance of U+0020..U+007E in em/1000 units.
+var timesASCII = [95]int{
+	250, 333, 408, 500, 500, 833, 777, 180, 333, 333, 500, 563, 250, 333, 250, 277,
+	500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 277, 277, 563, 563, 563, 443,
+	920, 722, 667, 667, 722, 610, 556, 722, 722, 333, 389, 722, 610, 889, 722, 722,
+	556, 722, 667, 556, 610, 722, 722, 943, 722, 722, 610, 333, 277, 333, 469, 500,
+	333, 443, 500, 443, 500, 443, 333, 500, 500, 277, 277, 500, 277, 777, 500, 500,
+	500, 500, 333, 389, 277, 500, 500, 722, 500, 500, 443, 479, 200, 479, 541,
+}
+
+// textWidth is the font advance of text in points. A trailing space is
+// included when it is part of text; callers that only want ink trim it.
+func textWidth(family string, bold, italic bool, size float64, text string) (float64, bool) {
+	if text == "" || size < 0.5 {
+		return 0, true
+	}
+	path, _, ok := matchSystemFont(preferMetricFamily(family), bold, italic)
+	if !ok {
+		return 0, false
+	}
+	return measureText(path, size, text)
+}
+
 func measureText(path string, sizePt float64, text string) (width float64, covered bool) {
 	face := loadFace(path)
 	if face == nil || sizePt < 0.5 {

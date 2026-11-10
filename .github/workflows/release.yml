@@ -7,11 +7,37 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   binaries:
     runs-on: ubuntu-latest
     steps:
+      - name: Require a green OOXML run on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="${GITHUB_SHA}"
+          echo "waiting for OOXML on ${sha}"
+          for _ in $(seq 1 60); do
+            row=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ooxml.yml --commit "$sha" --limit 10 --json databaseId,status,conclusion,url,headBranch,event)
+            echo "$row"
+            ok=$(echo "$row" | jq -r '[.[] | select(.conclusion=="success")][0].url // empty')
+            if [ -n "$ok" ]; then
+              echo "OOXML green: $ok"
+              exit 0
+            fi
+            bad=$(echo "$row" | jq -r '[.[] | select(.conclusion=="failure" or .conclusion=="cancelled")][0].url // empty')
+            if [ -n "$bad" ]; then
+              echo "OOXML did not pass: $bad"
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "no green OOXML run for ${sha}"
+          exit 1
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5

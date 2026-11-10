@@ -136,7 +136,11 @@ func TestDirectShadingBecomesCard(t *testing.T) {
 }
 
 func TestNBSCardsAreGradients(t *testing.T) {
-	doc, err := Open("/tmp/corpus/nbs-alibaba.pdf")
+	pdf := corpusFile("nbs-alibaba")
+	if pdf == "" {
+		t.Skip("nbs-alibaba pdf not present")
+	}
+	doc, err := Open(pdf)
 	if err != nil {
 		t.Skip(err)
 	}
@@ -187,7 +191,11 @@ func TestSubscriptJoinsBelowALetter(t *testing.T) {
 }
 
 func TestPsumacLockIsOutline(t *testing.T) {
-	doc, err := Open("/tmp/corpus/psumac.pdf")
+	pdf := corpusFile("psumac")
+	if pdf == "" {
+		t.Skip("psumac pdf not present")
+	}
+	doc, err := Open(pdf)
 	if err != nil {
 		t.Skip(err)
 	}
@@ -216,7 +224,11 @@ func TestPsumacLockIsOutline(t *testing.T) {
 }
 
 func TestNBSLogoKeepsJPEG(t *testing.T) {
-	doc, err := Open("/tmp/corpus/nbs-alibaba.pdf")
+	pdf := corpusFile("nbs-alibaba")
+	if pdf == "" {
+		t.Skip("nbs-alibaba pdf not present")
+	}
+	doc, err := Open(pdf)
 	if err != nil {
 		t.Skip(err)
 	}

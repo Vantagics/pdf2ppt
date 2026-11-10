@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.6
+
+The picture, size, token, and LibreOffice render gates run in GitHub Actions. The workflow downloads the manifest into `PDF2PPT_CORPUS` (cached on the manifest hash, four retries) and the tests read that directory. A missing required PDF fails the job. `tsmc-2q25-zh` is still a warning: Cloudflare returns 403. `korea-privacy` is a warning too: the attachment link now returns the portal's expired-download page instead of a PDF. The other 34 decks, including mit-ocw-ses1 and mit-datamgmt, have stored picture counts, v1.4.0 sizes, token counts, and a rendered page. The release job publishes binaries only after the OOXML run on that commit is green.
+
 ## 1.4.5
 
 v1.4.4 gave every contour of a custom geometry its own `a:path`. PowerPoint fills each `a:path` by itself, so a second contour that was a hole was painted solid. That filled the WPS title frame (`#262626` over the card; page 1 SSIM 0.970 to 0.577), the WPS page 2 and page 4 rings, the Mahidol wordmark counters, the Beijing triangle, the McGill crest, and the Keynote lock. Every contour of one fill is one `a:path` again. An even-odd hole that winds the same way as the shape around it is reversed, so `fill="norm"` (nonzero) punches the same hole. The 0.15 pt grid snap and the Type 3 line merge stay; they do not split the path.

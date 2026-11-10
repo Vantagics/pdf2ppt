@@ -9,32 +9,19 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 )
 
 // renderSample is one slide whose LibreOffice render is stored under
-// testdata/render. A hole that fills solid moves the mean pixel error well
-// past the tolerance; token and byte-size checks do not see that.
+// testdata/render. The list lives in corpus_gate_v145.json so every gated
+// deck has a page, including the hole slides (WPS 1/2/4, Mahidol, Beijing,
+// McGill, the Keynote lock). A filled hole moves the mean pixel error well
+// past the tolerance.
 type renderSample struct {
-	name string
-	pdf  []string
-	page int // 1-based
-}
-
-var renderSamples = []renderSample{
-	{name: "wps-p1", pdf: []string{"/tmp/corpus/wps.pdf"}, page: 1},
-	{name: "wps-p2", pdf: []string{"/tmp/corpus/wps.pdf"}, page: 2},
-	{name: "wps-p4", pdf: []string{"/tmp/corpus/wps.pdf"}, page: 4},
-	{name: "psumac-p30", pdf: []string{"/tmp/corpus/psumac.pdf"}, page: 30},
-	{name: "beamer-mcgill-p1", pdf: []string{"/tmp/corpus2/beamer-mcgill.pdf"}, page: 1},
-	{name: "canva-mahidol-p1", pdf: []string{
-		"/home/ubuntu/.cursor/projects/workspace/uploads/canva-mahidol-adv_104f.pdf",
-		"/tmp/corpus/canva-mahidol.pdf",
-	}, page: 1},
-	{name: "bjedu-2026-p1", pdf: []string{
-		"/tmp/corpus/bjedu-2026.pdf",
-		"/tmp/bjedu-2026.pdf",
-	}, page: 1},
+	Name string `json:"name"`
+	ID   string `json:"id"`
+	Page int    `json:"page"`
 }
 
 func TestRenderedSlidesMatchBaseline(t *testing.T) {
@@ -44,21 +31,39 @@ func TestRenderedSlidesMatchBaseline(t *testing.T) {
 	if _, err := exec.LookPath("pdftoppm"); err != nil {
 		t.Skip("pdftoppm not installed")
 	}
-	found := 0
-	for _, s := range renderSamples {
-		pdf := firstExisting(s.pdf)
+	gate := loadCorpusGate(t)
+	if len(gate.Renders) < requiredCorpusDecks {
+		t.Fatalf("render gate lists %d pages, want at least %d", len(gate.Renders), requiredCorpusDecks)
+	}
+	var missing []string
+	type job struct {
+		sample renderSample
+		pdf    string
+	}
+	var jobs []job
+	for _, s := range gate.Renders {
+		pdf := corpusPDF(s.ID)
 		if pdf == "" {
-			t.Logf("skip %s: pdf not on this machine", s.name)
+			missing = append(missing, s.Name)
 			continue
 		}
-		basePath := filepath.Join("testdata", "render", s.name+".png")
-		base, err := readPNG(basePath)
-		if err != nil {
-			t.Fatalf("%s: baseline %s: %v", s.name, basePath, err)
-		}
-		found++
-		t.Run(s.name, func(t *testing.T) {
-			got := renderSlide(t, pdf, s.page)
+		jobs = append(jobs, job{s, pdf})
+	}
+	if len(missing) > 0 && corpusRequired() {
+		t.Fatalf("missing %d render PDFs in %s: %s", len(missing), os.Getenv("PDF2PPT_CORPUS"), strings.Join(missing, ", "))
+	}
+	if len(jobs) == 0 {
+		t.Skip("no sampled PDFs; set PDF2PPT_CORPUS")
+	}
+	for _, j := range jobs {
+		j := j
+		t.Run(j.sample.Name, func(t *testing.T) {
+			basePath := filepath.Join("testdata", "render", j.sample.Name+".png")
+			base, err := readPNG(basePath)
+			if err != nil {
+				t.Fatalf("baseline %s: %v", basePath, err)
+			}
+			got := renderSlideNamed(t, j.pdf, j.sample.ID, j.sample.Page)
 			if got.Bounds() != base.Bounds() {
 				t.Fatalf("size %v, baseline %v", got.Bounds().Size(), base.Bounds().Size())
 			}
@@ -70,26 +75,24 @@ func TestRenderedSlidesMatchBaseline(t *testing.T) {
 			}
 		})
 	}
-	if found == 0 {
-		t.Skip("no sampled PDFs on this machine")
-	}
-}
-
-func firstExisting(paths []string) string {
-	for _, p := range paths {
-		if st, err := os.Stat(p); err == nil && st.Size() > 0 {
-			return p
-		}
-	}
-	return ""
 }
 
 func renderSlide(t *testing.T, pdf string, page int) image.Image {
 	t.Helper()
+	return renderSlideNamed(t, pdf, "", page)
+}
+
+func renderSlideNamed(t *testing.T, pdf, cacheName string, page int) image.Image {
+	t.Helper()
 	dir := t.TempDir()
-	pptx := filepath.Join(dir, "out.pptx")
-	if _, err := NewConverter(nil).Convert(pdf, pptx); err != nil {
-		t.Fatal(err)
+	var pptx string
+	if cacheName != "" {
+		pptx = ensurePPTX(t, pdf, cacheName)
+	} else {
+		pptx = filepath.Join(dir, "out.pptx")
+		if _, err := NewConverter(nil).Convert(pdf, pptx); err != nil {
+			t.Fatal(err)
+		}
 	}
 	profile := filepath.Join(dir, "lo")
 	pdfOut := filepath.Join(dir, "lo-pdf")
@@ -109,8 +112,9 @@ func renderSlide(t *testing.T, pdf string, page int) image.Image {
 		t.Fatal(err)
 	}
 	prefix := filepath.Join(pngDir, "page")
+	base := strings.TrimSuffix(filepath.Base(pptx), filepath.Ext(pptx))
 	cmd = exec.Command("pdftoppm", "-png", "-r", "40", "-f", strconv.Itoa(page), "-l", strconv.Itoa(page),
-		filepath.Join(pdfOut, "out.pdf"), prefix)
+		filepath.Join(pdfOut, base+".pdf"), prefix)
 	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 	}

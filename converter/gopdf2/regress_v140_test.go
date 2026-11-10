@@ -1,15 +1,15 @@
 package gopdf2
 
 import (
-	"os"
 	"testing"
 )
 
 func TestCanvaScriptWordmarkIsDrawn(t *testing.T) {
-	if _, err := os.Stat("/tmp/corpus/canva.pdf"); err != nil {
+	pdf := corpusFile("canva")
+	if pdf == "" {
 		t.Skip("canva pdf not present")
 	}
-	doc, err := Open("/tmp/corpus/canva.pdf")
+	doc, err := Open(pdf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,10 +40,11 @@ func TestCanvaScriptWordmarkIsDrawn(t *testing.T) {
 }
 
 func TestUAIPicturesAreNotClippedAway(t *testing.T) {
-	if _, err := os.Stat("/tmp/corpus/uai.pdf"); err != nil {
+	pdf := corpusFile("uai")
+	if pdf == "" {
 		t.Skip("uai pdf not present")
 	}
-	doc, err := Open("/tmp/corpus/uai.pdf")
+	doc, err := Open(pdf)
 	if err != nil {
 		t.Fatal(err)
 	}

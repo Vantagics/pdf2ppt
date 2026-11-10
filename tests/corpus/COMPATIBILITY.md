@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.4.6
+
+GitHub Actions fetches the corpus and runs `TestPictureCountBaseline` and `TestRenderedSlidesMatchBaseline` with `-v`. `PDF2PPT_CORPUS` is the directory. Fewer than the required decks fails the job. `tsmc-2q25-zh` (Cloudflare 403) and `korea-privacy` (expired attachment link) are warnings. The other 34 decks, including both MIT decks, are gated on picture count, v1.4.0 size, tokens, and a LibreOffice render. A release tag waits for that OOXML run to be green.
+
 ## v1.4.5
 
 A fill with a hole is one `a:path`. PowerPoint fills each `a:path` separately, which is why v1.4.4 painted the WPS frame, the lock, the wordmark counters, the Beijing triangle, and the McGill crest solid. An even-odd hole that winds with the outer contour is reversed so nonzero fill matches. Logo JPEGs stay JPEG, including ones at most 400 px wide.

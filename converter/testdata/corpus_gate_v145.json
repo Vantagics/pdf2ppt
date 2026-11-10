@@ -1,0 +1,465 @@
+{
+  "source": "v1.4.5",
+  "note": "Picture count, picture area, unique Latin tokens, concatenated a:t tokens, and v1.4.0 PPTX bytes for every manifest deck except the known-blocked TSMC file. Renders are LibreOffice page images. A later build fails if pictures or tokens drop more than 0.3%, area drops more than the slack, the PPTX exceeds 110% of the v1.4.0 size, or a rendered page drifts.",
+  "decks": {
+    "aist-ohno": {
+      "pics": 51,
+      "area": 306097030501662,
+      "areaSlack": 0.02,
+      "tokens": 130,
+      "concatTokens": 138,
+      "sizeV140": 8675850
+    },
+    "beamer-flip": {
+      "pics": 36,
+      "area": 550819963402226,
+      "areaSlack": 0.02,
+      "tokens": 569,
+      "concatTokens": 684,
+      "sizeV140": 1565950
+    },
+    "beamer-mcgill": {
+      "pics": 0,
+      "area": 0,
+      "areaSlack": 0.02,
+      "tokens": 27,
+      "concatTokens": 27,
+      "sizeV140": 15626
+    },
+    "bjedu-2024b": {
+      "pics": 167,
+      "area": 1378043973543596,
+      "areaSlack": 0.02,
+      "tokens": 76,
+      "concatTokens": 74,
+      "sizeV140": 8904797
+    },
+    "bjedu-2026": {
+      "pics": 212,
+      "area": 2651523813244745,
+      "areaSlack": 0.02,
+      "tokens": 411,
+      "concatTokens": 510,
+      "sizeV140": 13286338
+    },
+    "bjedu-kyc": {
+      "pics": 128,
+      "area": 2185127787708253,
+      "areaSlack": 0.02,
+      "tokens": 32,
+      "concatTokens": 36,
+      "sizeV140": 12036246
+    },
+    "canva-mahidol-adv": {
+      "pics": 41,
+      "area": 2826233717689387,
+      "areaSlack": 0.02,
+      "tokens": 85,
+      "concatTokens": 152,
+      "sizeV140": 20996462
+    },
+    "canva-rotary": {
+      "pics": 41,
+      "area": 2387029254021106,
+      "areaSlack": 0.02,
+      "tokens": 216,
+      "concatTokens": 411,
+      "sizeV140": 17005390
+    },
+    "cdc-nbs-m365": {
+      "pics": 82,
+      "area": 1477020305074138,
+      "areaSlack": 0.02,
+      "tokens": 850,
+      "concatTokens": 894,
+      "sizeV140": 5732020
+    },
+    "cesar2025-ai": {
+      "pics": 37,
+      "area": 922376609562601,
+      "areaSlack": 0.02,
+      "tokens": 671,
+      "concatTokens": 592,
+      "sizeV140": 7187450
+    },
+    "ecss24-harman": {
+      "pics": 44,
+      "area": 487205591024439,
+      "areaSlack": 0.02,
+      "tokens": 243,
+      "concatTokens": 262,
+      "sizeV140": 3403936
+    },
+    "gzmtu-ppt-2013": {
+      "pics": 187,
+      "area": 2179894689976743,
+      "areaSlack": 0.02,
+      "tokens": 15,
+      "concatTokens": 16,
+      "sizeV140": 14417943
+    },
+    "kaist-xai": {
+      "pics": 24,
+      "area": 368693317805184,
+      "areaSlack": 0.02,
+      "tokens": 35,
+      "concatTokens": 35,
+      "sizeV140": 826716
+    },
+    "kust-pressure": {
+      "pics": 8,
+      "area": 12960840392244,
+      "areaSlack": 0.02,
+      "tokens": 8,
+      "concatTokens": 20,
+      "sizeV140": 122607
+    },
+    "libo-cjk": {
+      "pics": 38,
+      "area": 496607347423915,
+      "areaSlack": 0.02,
+      "tokens": 366,
+      "concatTokens": 360,
+      "sizeV140": 3390837
+    },
+    "macadmins-autopkg-google": {
+      "pics": 24,
+      "area": 502834788222202,
+      "areaSlack": 0.02,
+      "tokens": 356,
+      "concatTokens": 386,
+      "sizeV140": 2851572
+    },
+    "mine-safety": {
+      "pics": 309,
+      "area": 1705945058940353,
+      "areaSlack": 0.02,
+      "tokens": 129,
+      "concatTokens": 141,
+      "sizeV140": 14724496
+    },
+    "mit-datamgmt": {
+      "pics": 159,
+      "area": 289135601553144,
+      "areaSlack": 0.02,
+      "tokens": 835,
+      "concatTokens": 849,
+      "sizeV140": 1467380
+    },
+    "mit-ocw-ses1": {
+      "pics": 52,
+      "area": 610070312115000,
+      "areaSlack": 0.02,
+      "tokens": 465,
+      "concatTokens": 470,
+      "sizeV140": 2163555
+    },
+    "nbs-alibaba": {
+      "pics": 264,
+      "area": 3503848406336635,
+      "areaSlack": 0.02,
+      "tokens": 751,
+      "concatTokens": 780,
+      "sizeV140": 15293778
+    },
+    "neurips-effxfmr": {
+      "pics": 123,
+      "area": 1114123510035013,
+      "areaSlack": 0.02,
+      "tokens": 1251,
+      "concatTokens": 1328,
+      "sizeV140": 12175108
+    },
+    "nhsa-ypsw": {
+      "pics": 51,
+      "area": 301334663704145,
+      "areaSlack": 0.02,
+      "tokens": 141,
+      "concatTokens": 159,
+      "sizeV140": 787071
+    },
+    "nrcs-cattle-distiller": {
+      "pics": 48,
+      "area": 70358537982422,
+      "areaSlack": 0.02,
+      "tokens": 556,
+      "concatTokens": 604,
+      "sizeV140": 1043217
+    },
+    "psumac-keynote": {
+      "pics": 140,
+      "area": 15359140338467844,
+      "areaSlack": 0.02,
+      "tokens": 430,
+      "concatTokens": 458,
+      "sizeV140": 89077439
+    },
+    "saasopen-google": {
+      "pics": 61,
+      "area": 470210705005334,
+      "areaSlack": 0.02,
+      "tokens": 226,
+      "concatTokens": 242,
+      "sizeV140": 10438412
+    },
+    "tencent-4q24": {
+      "pics": 157,
+      "area": 639620128278624,
+      "areaSlack": 0.02,
+      "tokens": 1211,
+      "concatTokens": 1366,
+      "sizeV140": 5608990
+    },
+    "tx-hhs-word": {
+      "pics": 4,
+      "area": 29353425430065,
+      "areaSlack": 0.02,
+      "tokens": 167,
+      "concatTokens": 167,
+      "sizeV140": 267242
+    },
+    "uab-isc2-2016": {
+      "pics": 228,
+      "area": 3716712610121636,
+      "areaSlack": 0.02,
+      "tokens": 595,
+      "concatTokens": 628,
+      "sizeV140": 7003252
+    },
+    "uab-reo-m365": {
+      "pics": 66,
+      "area": 1473967810384521,
+      "areaSlack": 0.02,
+      "tokens": 1363,
+      "concatTokens": 1435,
+      "sizeV140": 5023188
+    },
+    "uai2025-keynote": {
+      "pics": 253,
+      "area": 1968485846288668,
+      "areaSlack": 0.02,
+      "tokens": 691,
+      "concatTokens": 756,
+      "sizeV140": 25670775
+    },
+    "undp-gender-ar": {
+      "pics": 40,
+      "area": 386846049231427,
+      "areaSlack": 0.02,
+      "tokens": 2,
+      "concatTokens": 2,
+      "sizeV140": 9042728
+    },
+    "who-tb-2024": {
+      "pics": 116,
+      "area": 1133522682376853,
+      "areaSlack": 0.02,
+      "tokens": 836,
+      "concatTokens": 991,
+      "sizeV140": 2321177
+    },
+    "wps-demo-case": {
+      "pics": 2,
+      "area": 50562433068480,
+      "areaSlack": 0.02,
+      "tokens": 1,
+      "concatTokens": 2,
+      "sizeV140": 193057
+    },
+    "wps-tutorial": {
+      "pics": 0,
+      "area": 0,
+      "areaSlack": 0.02,
+      "tokens": 9,
+      "concatTokens": 7,
+      "sizeV140": 36657
+    }
+  },
+  "renders": [
+    {
+      "name": "aist-ohno-p1",
+      "id": "aist-ohno",
+      "page": 1
+    },
+    {
+      "name": "beamer-flip-p1",
+      "id": "beamer-flip",
+      "page": 1
+    },
+    {
+      "name": "beamer-mcgill-p1",
+      "id": "beamer-mcgill",
+      "page": 1
+    },
+    {
+      "name": "bjedu-2024b-p1",
+      "id": "bjedu-2024b",
+      "page": 1
+    },
+    {
+      "name": "bjedu-2026-p1",
+      "id": "bjedu-2026",
+      "page": 1
+    },
+    {
+      "name": "bjedu-kyc-p1",
+      "id": "bjedu-kyc",
+      "page": 1
+    },
+    {
+      "name": "canva-mahidol-adv-p1",
+      "id": "canva-mahidol-adv",
+      "page": 1
+    },
+    {
+      "name": "canva-rotary-p1",
+      "id": "canva-rotary",
+      "page": 1
+    },
+    {
+      "name": "cdc-nbs-m365-p1",
+      "id": "cdc-nbs-m365",
+      "page": 1
+    },
+    {
+      "name": "cesar2025-ai-p1",
+      "id": "cesar2025-ai",
+      "page": 1
+    },
+    {
+      "name": "ecss24-harman-p1",
+      "id": "ecss24-harman",
+      "page": 1
+    },
+    {
+      "name": "gzmtu-ppt-2013-p1",
+      "id": "gzmtu-ppt-2013",
+      "page": 1
+    },
+    {
+      "name": "kaist-xai-p1",
+      "id": "kaist-xai",
+      "page": 1
+    },
+    {
+      "name": "kust-pressure-p1",
+      "id": "kust-pressure",
+      "page": 1
+    },
+    {
+      "name": "libo-cjk-p1",
+      "id": "libo-cjk",
+      "page": 1
+    },
+    {
+      "name": "macadmins-autopkg-google-p1",
+      "id": "macadmins-autopkg-google",
+      "page": 1
+    },
+    {
+      "name": "mine-safety-p1",
+      "id": "mine-safety",
+      "page": 1
+    },
+    {
+      "name": "mit-datamgmt-p1",
+      "id": "mit-datamgmt",
+      "page": 1
+    },
+    {
+      "name": "mit-ocw-ses1-p1",
+      "id": "mit-ocw-ses1",
+      "page": 1
+    },
+    {
+      "name": "nbs-alibaba-p1",
+      "id": "nbs-alibaba",
+      "page": 1
+    },
+    {
+      "name": "neurips-effxfmr-p1",
+      "id": "neurips-effxfmr",
+      "page": 1
+    },
+    {
+      "name": "nhsa-ypsw-p1",
+      "id": "nhsa-ypsw",
+      "page": 1
+    },
+    {
+      "name": "nrcs-cattle-distiller-p1",
+      "id": "nrcs-cattle-distiller",
+      "page": 1
+    },
+    {
+      "name": "psumac-keynote-p1",
+      "id": "psumac-keynote",
+      "page": 1
+    },
+    {
+      "name": "psumac-keynote-p30",
+      "id": "psumac-keynote",
+      "page": 30
+    },
+    {
+      "name": "saasopen-google-p1",
+      "id": "saasopen-google",
+      "page": 1
+    },
+    {
+      "name": "tencent-4q24-p1",
+      "id": "tencent-4q24",
+      "page": 1
+    },
+    {
+      "name": "tx-hhs-word-p1",
+      "id": "tx-hhs-word",
+      "page": 1
+    },
+    {
+      "name": "uab-isc2-2016-p1",
+      "id": "uab-isc2-2016",
+      "page": 1
+    },
+    {
+      "name": "uab-reo-m365-p1",
+      "id": "uab-reo-m365",
+      "page": 1
+    },
+    {
+      "name": "uai2025-keynote-p1",
+      "id": "uai2025-keynote",
+      "page": 1
+    },
+    {
+      "name": "undp-gender-ar-p1",
+      "id": "undp-gender-ar",
+      "page": 1
+    },
+    {
+      "name": "who-tb-2024-p1",
+      "id": "who-tb-2024",
+      "page": 1
+    },
+    {
+      "name": "wps-demo-case-p1",
+      "id": "wps-demo-case",
+      "page": 1
+    },
+    {
+      "name": "wps-tutorial-p1",
+      "id": "wps-tutorial",
+      "page": 1
+    },
+    {
+      "name": "wps-tutorial-p2",
+      "id": "wps-tutorial",
+      "page": 2
+    },
+    {
+      "name": "wps-tutorial-p4",
+      "id": "wps-tutorial",
+      "page": 4
+    }
+  ]
+}

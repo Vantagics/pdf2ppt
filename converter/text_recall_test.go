@@ -3,7 +3,6 @@ package converter
 import (
 	"archive/zip"
 	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -18,32 +17,33 @@ func TestTextRecall(t *testing.T) {
 		t.Skip("pdftotext is not installed")
 	}
 	cases := []struct {
-		pdf  string
+		name string
 		want []string
 	}{
-		{"/tmp/corpus/tencent.pdf", []string{"CORPORATE", "OVERVIEW", "Fourth", "Quarter"}},
-		{"/tmp/corpus/saasopen.pdf", []string{"Subtle", "Business", "Yaroslav"}},
+		{"tencent-4q24", []string{"CORPORATE", "OVERVIEW", "Fourth", "Quarter"}},
+		{"saasopen-google", []string{"Subtle", "Business", "Yaroslav"}},
 	}
 	var ran bool
 	for _, tc := range cases {
-		if _, err := os.Stat(tc.pdf); err != nil {
+		pdf := corpusPDF(tc.name)
+		if pdf == "" {
 			continue
 		}
 		ran = true
 		out := filepath.Join(t.TempDir(), "out.pptx")
-		if _, err := NewConverter(nil).Convert(tc.pdf, out); err != nil {
+		if _, err := NewConverter(nil).Convert(pdf, out); err != nil {
 			t.Fatal(err)
 		}
 		pptxText := pptxText(t, out)
-		pdfText := pdftotext(t, tc.pdf)
+		pdfText := pdftotext(t, pdf)
 		for _, w := range tc.want {
 			if !strings.Contains(pptxText, w) {
-				t.Errorf("%s: PPTX text missing %q", tc.pdf, w)
+				t.Errorf("%s: PPTX text missing %q", tc.name, w)
 			}
 		}
 		recall := wordRecall(pdfText, pptxText)
 		if recall < 0.9 {
-			t.Errorf("%s: word recall %.2f", tc.pdf, recall)
+			t.Errorf("%s: word recall %.2f", tc.name, recall)
 		}
 	}
 	if !ran {

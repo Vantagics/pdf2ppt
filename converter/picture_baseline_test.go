@@ -26,27 +26,110 @@ type pictureBaseline struct {
 	} `json:"decks"`
 }
 
+// requiredCorpusDecks is every manifest PDF except the generated chrome-skia
+// fixture and the two known-blocked URLs (tsmc Cloudflare 403, korea-privacy
+// attachment link that now returns an expired-download page).
+const requiredCorpusDecks = 34
+
+type corpusGate struct {
+	Source string `json:"source"`
+	Decks  map[string]struct {
+		Pics         int     `json:"pics"`
+		Area         int64   `json:"area"`
+		AreaSlack    float64 `json:"areaSlack"`
+		Tokens       int     `json:"tokens"`
+		ConcatTokens int     `json:"concatTokens"`
+		SizeV140     int64   `json:"sizeV140"`
+	} `json:"decks"`
+	Renders []renderSample `json:"renders"`
+}
+
+func loadCorpusGate(t *testing.T) corpusGate {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/corpus_gate_v145.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gate corpusGate
+	if err := json.Unmarshal(raw, &gate); err != nil {
+		t.Fatal(err)
+	}
+	if len(gate.Decks) < requiredCorpusDecks {
+		t.Fatalf("corpus gate lists %d decks, want at least %d", len(gate.Decks), requiredCorpusDecks)
+	}
+	return gate
+}
+
 func TestPictureCountBaseline(t *testing.T) {
+	gate := loadCorpusGate(t)
 	raw, err := os.ReadFile("testdata/picture_baseline_v137.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var base pictureBaseline
-	if err := json.Unmarshal(raw, &base); err != nil {
+	var legacy pictureBaseline
+	if err := json.Unmarshal(raw, &legacy); err != nil {
 		t.Fatal(err)
 	}
+	seen := map[string]bool{}
+	var missing []string
 	found := 0
-	for name, want := range base.Decks {
+	for name, want := range gate.Decks {
 		pdf := corpusPDF(name)
 		if pdf == "" {
+			missing = append(missing, name)
 			continue
 		}
+		seen[pdf] = true
 		found++
+		name, want := name, want
 		t.Run(name, func(t *testing.T) {
-			out := filepath.Join(t.TempDir(), "out.pptx")
-			if _, err := NewConverter(nil).Convert(pdf, out); err != nil {
-				t.Fatal(err)
+			out := ensurePPTX(t, pdf, name)
+			pics, area := pptxPictures(t, out)
+			if want.SizeV140 > 0 {
+				st, err := os.Stat(out)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if st.Size() > int64(float64(want.SizeV140)*1.10) {
+					t.Fatalf("pptx is %d bytes, more than 10%% over the v1.4.0 size %d", st.Size(), want.SizeV140)
+				}
 			}
+			if pics < want.Pics {
+				t.Fatalf("p:pic %d, baseline %d", pics, want.Pics)
+			}
+			slack := want.AreaSlack
+			if slack == 0 {
+				slack = 0.02
+			}
+			if want.Area > 0 && float64(area) < float64(want.Area)*(1-slack) {
+				t.Fatalf("picture area %d is below the baseline %d (slack %.0f%%)", area, want.Area, slack*100)
+			}
+			if want.Tokens > 0 {
+				got := pptxTokens(t, out)
+				if float64(got) < float64(want.Tokens)*0.997 {
+					t.Fatalf("unique latin tokens %d, baseline %d", got, want.Tokens)
+				}
+			}
+			if want.ConcatTokens > 0 {
+				got := pptxConcatTokens(t, out)
+				if float64(got) < float64(want.ConcatTokens)*0.997 {
+					t.Fatalf("concatenated tokens %d, baseline %d", got, want.ConcatTokens)
+				}
+			}
+		})
+	}
+	// Decks that predate the manifest keep the v1.3.7 numbers when their PDF
+	// is on the machine and was not already checked under a manifest id.
+	for name, want := range legacy.Decks {
+		pdf := corpusPDF(name)
+		if pdf == "" || seen[pdf] {
+			continue
+		}
+		seen[pdf] = true
+		found++
+		name, want := name, want
+		t.Run("legacy-"+name, func(t *testing.T) {
+			out := ensurePPTX(t, pdf, name)
 			pics, area := pptxPictures(t, out)
 			if base, ok := sizeBaseline[name]; ok && base > 0 {
 				st, err := os.Stat(out)
@@ -69,33 +152,57 @@ func TestPictureCountBaseline(t *testing.T) {
 			}
 			if want.Tokens > 0 {
 				got := pptxTokens(t, out)
-				// 0.3 percentage points of the stored token count.
 				if float64(got) < float64(want.Tokens)*0.997 {
 					t.Fatalf("unique latin tokens %d, v1.3.7 baseline %d", got, want.Tokens)
 				}
 			}
 			if base, ok := tokenBaseline[name]; ok && base > 0 {
 				got := pptxConcatTokens(t, out)
-				// v1.4.2 concatenates every a:t before splitting words, so a
-				// missing bullet glues the neighbors. 0.3 percent under fails.
 				if float64(got) < float64(base)*0.997 {
 					t.Fatalf("concatenated tokens %d, v1.4.2 baseline %d", got, base)
 				}
 			}
 		})
 	}
+	if len(missing) > 0 && corpusRequired() {
+		t.Fatalf("missing %d of %d gated PDFs in %s: %s", len(missing), len(gate.Decks), os.Getenv("PDF2PPT_CORPUS"), strings.Join(missing, ", "))
+	}
+	if found < requiredCorpusDecks && corpusRequired() {
+		t.Fatalf("opened %d gated PDFs, want at least %d", found, requiredCorpusDecks)
+	}
 	if found == 0 {
-		t.Skip("no corpus PDFs in /tmp/corpus")
+		t.Skip("no corpus PDFs; set PDF2PPT_CORPUS")
 	}
 }
 
-// sizeBaseline is the v1.4.0 PPTX size in bytes. v1.4.1 re-encoded JPEG
-// photos as PNG and the corpus grew by 87%. A deck may shrink. It may not
-// grow by more than 10%. The check runs only for a name in this file whose
-// PDF corpusPDF can open. mit-ocw-ses1 and mit-datamgmt are not in the file
-// (it was recorded from the v1.4.0 local corpus) and their PDFs are not
-// under /tmp/corpus, so a size jump on those decks does not fail the test.
-// GitHub CI checks out no corpus PDFs, so the test skips there as well.
+// ensurePPTX converts pdf once. PDF2PPT_PPTX_CACHE shares that file with the
+// render gate so CI does not convert every deck twice.
+func ensurePPTX(t *testing.T, pdf, name string) string {
+	t.Helper()
+	if dir := os.Getenv("PDF2PPT_PPTX_CACHE"); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		out := filepath.Join(dir, name+".pptx")
+		if st, err := os.Stat(out); err == nil && st.Size() > 0 {
+			return out
+		}
+		if _, err := NewConverter(nil).Convert(pdf, out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	out := filepath.Join(t.TempDir(), "out.pptx")
+	if _, err := NewConverter(nil).Convert(pdf, out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// sizeBaseline is the v1.4.0 PPTX size for decks that predate the manifest
+// gate. The 35 gated decks carry sizeV140 inside corpus_gate_v145.json and
+// are checked from TestPictureCountBaseline. A deck may shrink. It may not
+// grow by more than 10%.
 var sizeBaseline map[string]int64
 
 func init() {
@@ -148,24 +255,12 @@ func TestPPTXSizeBaseline(t *testing.T) {
 		})
 	}
 	if found == 0 {
+		if corpusRequired() {
+			t.Log("gated deck sizes are checked in TestPictureCountBaseline")
+			return
+		}
 		t.Skip("no extra corpus PDFs")
 	}
-}
-
-func corpusPDF(name string) string {
-	candidates := []string{filepath.Join("/tmp/corpus", name+".pdf")}
-	if name == "canva-mahidol" {
-		candidates = append(candidates,
-			"/home/ubuntu/.cursor/projects/workspace/uploads/canva-mahidol-adv_104f.pdf",
-			filepath.Join("/tmp/corpus", "canva-mahidol-adv.pdf"),
-		)
-	}
-	for _, p := range candidates {
-		if st, err := os.Stat(p); err == nil && st.Size() > 0 {
-			return p
-		}
-	}
-	return ""
 }
 
 var (

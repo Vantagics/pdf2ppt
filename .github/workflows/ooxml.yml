@@ -9,6 +9,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -18,6 +19,28 @@ jobs:
         with:
           dotnet-version: "8.0.x"
       - name: Install LibreOffice and Poppler
-        run: sudo apt-get update && sudo apt-get install -y libreoffice-impress poppler-utils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-impress poppler-utils
+          soffice --version
+          pdftoppm -v
+      - name: Restore the corpus cache
+        uses: actions/cache@v4
+        with:
+          path: tests/corpus/cache
+          key: corpus-${{ hashFiles('tests/corpus/manifest.json') }}
+          restore-keys: |
+            corpus-
+      - name: Fetch gated decks
+        env:
+          PDF2PPT_CORPUS: ${{ github.workspace }}/tests/corpus/cache
+        run: python3 tests/corpus/fetch.py
+      - name: Require the gated PDFs
+        env:
+          PDF2PPT_CORPUS: ${{ github.workspace }}/tests/corpus/cache
+        run: python3 tests/corpus/fetch.py
       - name: Validate generated PPTX against ECMA-376
-        run: go test ./converter ./converter/goppt ./converter/gopdf2 -count=1 -timeout 15m -run 'TestOOXML|TestTextOutline|TestHole|TestRendered|TestMixedPageSize|TestMITSlideSize|TestDominant|TestLetterbox|TestUnmatte|TestFlatten|TestRotatePage|TestMergeHyphen|TestTightWordSpace|TestPDFMaker|TestDeviceGray|TestLightWordmark|TestTwoImages|TestImageClip|TestStitch|TestDropDuplicate|TestPictureCount|TestPPTXSize|TestCanvaScript|TestUAI|TestIndexed|TestDuplicateKeeps|TestZeroAlpha|TestFrame|TestTextRecall|TestChevron|TestRewriteWingdings'
+        env:
+          PDF2PPT_CORPUS: ${{ github.workspace }}/tests/corpus/cache
+          PDF2PPT_PPTX_CACHE: ${{ runner.temp }}/pptx
+        run: go test ./converter ./converter/goppt ./converter/gopdf2 -count=1 -timeout 75m -v -run 'TestOOXML|TestTextOutline|TestHole|TestRendered|TestMixedPageSize|TestMITSlideSize|TestDominant|TestLetterbox|TestUnmatte|TestFlatten|TestRotatePage|TestMergeHyphen|TestTightWordSpace|TestPDFMaker|TestDeviceGray|TestLightWordmark|TestTwoImages|TestImageClip|TestStitch|TestDropDuplicate|TestPictureCount|TestPPTXSize|TestCanvaScript|TestUAI|TestIndexed|TestDuplicateKeeps|TestZeroAlpha|TestFrame|TestTextRecall|TestChevron|TestRewriteWingdings'

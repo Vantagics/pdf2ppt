@@ -90,6 +90,9 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	// Later passes can glue a Latin letter back onto Hebrew. The space has
 	// to be in the text that is actually written.
 	separateRTLNeighbors(page)
+	// After x and width are final. Lato becomes Calibri with the spacing
+	// that fills the PDF width and no more.
+	fitLatoToCalibri(page)
 	page.syncLists()
 	return page, nil
 }

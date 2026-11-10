@@ -982,6 +982,12 @@ func pullBackOverlaps(p *Page) {
 		// points. Only a real collision (Andy through Morodo) is pulled back.
 		// Never move the next box. v1.5.4 parked it on this box's right
 		// edge, and every later word shifted ("youregistered", kaist p18).
+		// Lato is drawn in Calibri, spaced to this PDF width. Shortening
+		// the box clips the last letter; widening it lets that letter
+		// run into the next word.
+		if isLato(a.FontName) {
+			continue
+		}
 		wordEdge := strings.HasSuffix(a.Content, " ") || strings.HasPrefix(b.Content, " ")
 		if overlap < math.Max(em*1.2, old*0.18) && !(wordEdge && overlap > 1.2) {
 			continue
@@ -1012,10 +1018,6 @@ func pullBackOverlaps(p *Page) {
 			a.Tracking += (nw - old) / float64(gaps)
 		}
 		a.Width = nw
-		// Clip only when the box is still shorter than the glyphs. A box
-		// that holds the advance must not cut the last letter.
-		if adv, ok := textWidth(a.FontName, a.Bold, a.Italic, a.FontSize, a.Content); ok && nw < adv-0.4 {
-			a.Clip = true
-		}
+		a.Clip = true
 	}
 }

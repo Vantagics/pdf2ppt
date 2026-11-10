@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.6
+
+Lato runs are Calibri, spaced so the advance ends at the next glyph's PDF x. `canva-rotary` pages 1 and 16 keep the spaces in "Account for", "nonprofit organizations", and "not-for-profit basis". `kaist-xai` page 18 is unchanged from v1.5.3. The render gate fails when a slide's mean error rises more than 1.0 over the LibreOffice 26.2 baseline. Recall baselines: cdc-nbs-m365 84.11 on this tokenizer (84.47 independent), mit-ocw-ses1 90.40, nhsa-ypsw 98.99, who-tb-2024 86.52.
+
 ## v1.5.5
 
 v1.5.4 is regressed. Text boxes stay at the PDF x, including the next word. `kaist-xai` page 18 matches v1.5.3 again. `canva-rotary` page 16 keeps the last letter without shifting the following words. `he-openu-a11y` page 13 no longer overlaps באיתור and בניווט. Page 2, the Hebrew recall of 1, and the UNDP caption spaces stay. Those slides are in the render gate. canva-rotary and he-openu page 13 fail above a mean error of 16. kaist-xai page 18 fails above 28, which is the LibreOffice 26.2 difference on that page. UNDP unique recall is recorded as 1.

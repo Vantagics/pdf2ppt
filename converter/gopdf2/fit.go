@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
@@ -18,6 +19,12 @@ import (
 // so glyphs are not condensed; a larger mismatch is a uniform size change.
 func fitRun(family string, bold, italic bool, size, pdfWidth float64, text string) (string, float64, float64) {
 	if size < 0.5 || pdfWidth < 0.5 || strings.TrimSpace(text) == "" {
+		return family, size, 0
+	}
+	// Lato is fitted after lines merge, against the whole box, in Calibri.
+	// Fitting each glyph here renamed it to Noto Sans and shrank the em,
+	// and PowerPoint's wider substitute then ran into the next word.
+	if isLato(family) {
 		return family, size, 0
 	}
 	family = preferMetricFamily(family)
@@ -46,6 +53,86 @@ func fitRun(family string, bold, italic bool, size, pdfWidth float64, text strin
 // trackingFor returns the font size and per-character tracking (points) that
 // make measured ink match pdfWidth. Spacing is applied between characters,
 // not after the last one.
+// isLato reports a Canva Lato face. PowerPoint 2016 does not download the
+// Lato cloud font (that starts with Office 2019). A missing latin face is
+// substituted from the theme, which is Calibri. Carlito has Calibri's metrics.
+func isLato(family string) bool {
+	return strings.Contains(strings.ToLower(family), "lato")
+}
+
+func latoIsBold(family string, bold bool) bool {
+	n := strings.ToLower(family)
+	return bold || strings.Contains(n, "black") || strings.Contains(n, "heavy") || strings.Contains(n, "bold")
+}
+
+// fitLatoToCalibri sets Calibri and the character spacing that makes
+// PowerPoint's advance end at the next glyph's PDF x. The box itself is
+// not moved or widened. Spacing is between characters, matching a:rPr spc.
+func fitLatoToCalibri(p *Page) {
+	var refs []textRef
+	for i := range p.Elements {
+		t := p.Elements[i].Text
+		if t == nil || t.Vertical || !horizontal(t.Rotation) {
+			continue
+		}
+		refs = append(refs, textRef{i, t})
+	}
+	sortRefs(refs)
+	for i := range refs {
+		t := refs[i].t
+		if t.RTL || !isLato(t.FontName) || t.Width < 0.5 || strings.TrimSpace(t.Content) == "" {
+			continue
+		}
+		if len(t.Runs) > 1 {
+			uniform := true
+			for _, r := range t.Runs {
+				if !isLato(r.FontName) || math.Abs(r.FontSize-t.FontSize) > math.Max(t.FontSize*0.08, 0.4) {
+					uniform = false
+					break
+				}
+			}
+			if !uniform {
+				continue
+			}
+			t.Runs = nil
+		}
+		target := t.Width
+		for j := i + 1; j < len(refs); j++ {
+			n := refs[j].t
+			if !sameLine(t, n) || n.X <= t.X+0.5 {
+				continue
+			}
+			if n.X-t.X < target {
+				target = n.X - t.X
+			}
+			break
+		}
+		bold := latoIsBold(t.FontName, t.Bold)
+		italic := t.Italic || strings.Contains(strings.ToLower(t.FontName), "italic") || strings.Contains(strings.ToLower(t.FontName), "oblique")
+		path, _, ok := matchSystemFont("Carlito", bold, italic)
+		if !ok {
+			continue
+		}
+		measured, covered := measureText(path, t.FontSize, t.Content)
+		if !covered || measured < 0.5 {
+			continue
+		}
+		gaps := utf8.RuneCountInString(t.Content) - 1
+		if gaps < 1 {
+			if target > 0.5 {
+				t.FontSize *= target / measured
+			}
+			t.Tracking = 0
+		} else {
+			sp := math.Round((target-measured)/float64(gaps)*100) / 100
+			t.Tracking = sp
+		}
+		t.FontName = "Calibri"
+		t.Bold = bold
+		t.Italic = italic
+	}
+}
+
 // preferMetricFamily maps faces that are not installed here onto a system
 // family with a real bold and italic, instead of a faux slant of Cantarell.
 func preferMetricFamily(family string) string {

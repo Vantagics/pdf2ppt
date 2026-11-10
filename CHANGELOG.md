@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.6
+
+PowerPoint 2016 does not download Lato (that starts with Office 2019). A missing latin face is drawn in Calibri, the theme font. Calibri is not the same width as Lato, so a Lato run was either clipped or ran into the next word. Each Lato run is now Calibri, with character spacing that makes the advance end at the next glyph's PDF x. The box stays where the PDF put it. canva-rotary page 16 reads "Account for", "nonprofit organizations", and "not-for-profit basis".
+
+The render gate compares each slide with the CI LibreOffice (26.2) and fails when the mean error rises more than 1.0 above that slide's stored measurement. A flat ceiling of 24 let the v1.5.4 kaist page 18 shift pass. The stored pages were re-rendered with LibreOffice 26.2.
+
+Recall baselines move up to the new bests: mit-ocw-ses1 90.40, nhsa-ypsw 98.99, who-tb-2024 86.52. cdc-nbs-m365 reads 84.47 on the independent tokenizer and 84.11 on this gate's tokenizer, up from 83.53, so the stored value is 0.841121. uab-isc2-2016 reads 86.85, 0.16 percentage points under its stored 87.02, inside the 0.3 point tolerance, and its baseline stays.
+
 ## 1.5.5
 
 v1.5.4 is regressed and superseded. It parked the next word on the previous box's right edge. PowerPoint then drew the last ink about 7 px past that edge, and every later word shifted. kaist-xai page 18 fell from 0.8672 to 0.7058. canva-rotary pages 16, 8, and 1 and he-openu page 13 dropped with it.

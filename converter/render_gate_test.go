@@ -69,19 +69,47 @@ func TestRenderedSlidesMatchBaseline(t *testing.T) {
 				t.Fatalf("size %v, baseline %v", got.Bounds().Size(), base.Bounds().Size())
 			}
 			errv := meanAbsErr(base, got)
-			// The stored PNGs were rendered with LibreOffice 24.2. GitHub
-			// Actions has 26.2, and the same PPTX differs by up to about 16
-			// on text edges. A filled hole (the WPS title card) is about 90.
-			// Slides that regressed in v1.5.4 carry a tighter ceiling so a
-			// later shift of that page fails even when the mean stays under 24.
-			ceiling := 24.0
+			// The PNGs are rendered with the CI LibreOffice. A later build
+			// fails when its error rises more than 1.0 above the stored
+			// measurement for that slide. A flat ceiling of 24 let the
+			// v1.5.4 kaist page 18 shift (MAE 21.8) and canva page 8
+			// (MAE 6.1) pass.
+			ceiling := 1.0
 			if j.sample.MaxAbsErr > 0 {
-				ceiling = j.sample.MaxAbsErr
+				ceiling = j.sample.MaxAbsErr + 1
 			}
 			if errv > ceiling {
 				t.Fatalf("mean abs error %.2f, stored ceiling %.2f (layout changed)", errv, ceiling)
 			}
 		})
+	}
+}
+
+// TestRefreshRenderBaselines rewrites testdata/render from the current
+// converter and the LibreOffice on this machine. CI uses LibreOffice 26.2.
+//
+//	PDF2PPT_CORPUS=... PDF2PPT_REFRESH_RENDERS=1 go test ./converter -run TestRefreshRenderBaselines -timeout 90m
+func TestRefreshRenderBaselines(t *testing.T) {
+	if os.Getenv("PDF2PPT_REFRESH_RENDERS") != "1" {
+		t.Skip("set PDF2PPT_REFRESH_RENDERS=1")
+	}
+	gate := loadCorpusGate(t)
+	for _, s := range gate.Renders {
+		pdf := corpusPDF(s.ID)
+		if pdf == "" {
+			t.Fatalf("missing %s", s.ID)
+		}
+		t.Logf("render %s", s.Name)
+		img := renderSlideNamed(t, pdf, s.ID, s.Page)
+		f, err := os.Create(filepath.Join("testdata", "render", s.Name+".png"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := png.Encode(f, img); err != nil {
+			f.Close()
+			t.Fatal(err)
+		}
+		f.Close()
 	}
 }
 

@@ -33,6 +33,31 @@ func TestModerateMismatchDoesNotCondense(t *testing.T) {
 	}
 }
 
+func TestLatoRunFitsCalibriToPDFWidth(t *testing.T) {
+	tb := &TextObject{Content: "nonprofit ", FontName: "Lato-Black", FontSize: 34.7, X: 573.7, Y: 231, Width: 149.6, Height: 40}
+	p := &Page{Elements: []PageElement{{Text: tb}}}
+	fitLatoToCalibri(p)
+	if tb.FontName != "Calibri" || !tb.Bold {
+		t.Fatalf("font %q bold %v", tb.FontName, tb.Bold)
+	}
+	if tb.X != 573.7 || math.Abs(tb.Width-149.6) > 0.1 {
+		t.Fatalf("box moved: x %.1f w %.1f", tb.X, tb.Width)
+	}
+	path, _, ok := matchSystemFont("Carlito", true, false)
+	if !ok {
+		t.Fatal("carlito missing")
+	}
+	measured, covered := measureText(path, tb.FontSize, tb.Content)
+	if !covered {
+		t.Fatal("unmeasured")
+	}
+	gaps := len([]rune(tb.Content)) - 1
+	got := measured + tb.Tracking*float64(gaps)
+	if math.Abs(got-tb.Width) > 0.6 {
+		t.Fatalf("calibri advance %.2f, pdf width %.2f, tracking %.2f", got, tb.Width, tb.Tracking)
+	}
+}
+
 func TestTrackingLeavesMatchingFont(t *testing.T) {
 	sz, tr := trackingFor("HELLO", 12, 40, 40.5, func(float64) float64 { return 0 })
 	if sz != 12 || tr != 0 {

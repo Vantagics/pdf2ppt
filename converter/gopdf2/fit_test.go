@@ -33,28 +33,21 @@ func TestModerateMismatchDoesNotCondense(t *testing.T) {
 	}
 }
 
-func TestLatoRunFitsCalibriToPDFWidth(t *testing.T) {
+func TestLatoKeepsItsName(t *testing.T) {
 	tb := &TextObject{Content: "nonprofit ", FontName: "Lato-Black", FontSize: 34.7, X: 573.7, Y: 231, Width: 149.6, Height: 40}
 	p := &Page{Elements: []PageElement{{Text: tb}}}
-	fitLatoToCalibri(p)
-	if tb.FontName != "Calibri" || !tb.Bold {
-		t.Fatalf("font %q bold %v", tb.FontName, tb.Bold)
+	fitCloudFontSpacing(p)
+	if tb.FontName != "Lato-Black" {
+		t.Fatalf("font rewritten to %q", tb.FontName)
+	}
+	if tb.Tracking != 0 {
+		t.Fatalf("lato spacing %v, want 0 when the face is not installed", tb.Tracking)
 	}
 	if tb.X != 573.7 || math.Abs(tb.Width-149.6) > 0.1 {
 		t.Fatalf("box moved: x %.1f w %.1f", tb.X, tb.Width)
 	}
-	path, _, ok := matchSystemFont("Carlito", true, false)
-	if !ok {
-		t.Fatal("carlito missing")
-	}
-	measured, covered := measureText(path, tb.FontSize, tb.Content)
-	if !covered {
-		t.Fatal("unmeasured")
-	}
-	gaps := len([]rune(tb.Content)) - 1
-	got := measured + tb.Tracking*float64(gaps)
-	if math.Abs(got-tb.Width) > 0.6 {
-		t.Fatalf("calibri advance %.2f, pdf width %.2f, tracking %.2f", got, tb.Width, tb.Tracking)
+	if !isOfficeCloudFont("Anton") || !isOfficeCloudFont("Open Sans") || isOfficeCloudFont("Gill Sans") {
+		t.Fatal("cloud font list")
 	}
 }
 

@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.7
+
+Office cloud fonts keep their name: Lato, Anton, Montserrat, Open Sans, Roboto, Poppins, and a short list of the same kind. Calibri is only the fallback for a face that is not on that list. `canva-rotary` pages 8 and 16 stay in Lato, with no extra character spacing. Page 1 stays in Anton. `he-openu-a11y` page 13 has the 6.7 pt gap after באיתור again.
+
 ## v1.5.6
 
 Lato runs are Calibri, spaced so the advance ends at the next glyph's PDF x. `canva-rotary` pages 1 and 16 keep the spaces in "Account for", "nonprofit organizations", and "not-for-profit basis". `kaist-xai` page 18 is unchanged from v1.5.3. The render gate fails when a slide's mean error rises more than 1.0 over the LibreOffice 26.2 baseline. Recall baselines: cdc-nbs-m365 84.11 on this tokenizer (84.47 independent), mit-ocw-ses1 90.40, nhsa-ypsw 98.99, who-tb-2024 86.52.

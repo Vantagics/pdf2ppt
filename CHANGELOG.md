@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.7
+
+Microsoft 365 already has Lato, Anton, Montserrat, Open Sans, Roboto, and Poppins as cloud fonts. v1.5.6 rewrote Lato to Calibri, so canva-rotary page 8 dropped to 0.9130 from 0.9218. Those faces keep their PDF name. Spacing is adjusted only when the real font is installed and its advance misses the PDF width. Lato is not installed here, and its PDF widths are the cloud font's widths, so spc stays 0. Calibri remains the fallback for a face that is not on that list.
+
+Page 1's Anton words were merged and then renamed to Noto Sans, with each fragment's size fitted to Noto. v1.4.9 had left the fragments ("Basi"/"cs", "Vi"/"rtual", "Ski"/"ll") at their PDF x. The name is Anton again, at the PDF size.
+
+he-openu page 13 joins the comma back onto בניווט, so the gap after באיתור is 6.7 pt again instead of 16.6 pt, and the boxes do not overlap.
+
 ## 1.5.6
 
 PowerPoint 2016 does not download Lato (that starts with Office 2019). A missing latin face is drawn in Calibri, the theme font. Calibri is not the same width as Lato, so a Lato run was either clipped or ran into the next word. Each Lato run is now Calibri, with character spacing that makes the advance end at the next glyph's PDF x. The box stays where the PDF put it. canva-rotary page 16 reads "Account for", "nonprofit organizations", and "not-for-profit basis".

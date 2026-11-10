@@ -21,10 +21,10 @@ func fitRun(family string, bold, italic bool, size, pdfWidth float64, text strin
 	if size < 0.5 || pdfWidth < 0.5 || strings.TrimSpace(text) == "" {
 		return family, size, 0
 	}
-	// Lato is fitted after lines merge, against the whole box, in Calibri.
-	// Fitting each glyph here renamed it to Noto Sans and shrank the em,
-	// and PowerPoint's wider substitute then ran into the next word.
-	if isLato(family) {
+	// Office cloud fonts are downloaded by Microsoft 365. Renaming them
+	// to Noto Sans or Calibri draws a different face. The PDF advances
+	// already are that face, so the size and spacing stay.
+	if isOfficeCloudFont(family) {
 		return family, size, 0
 	}
 	family = preferMetricFamily(family)
@@ -53,83 +53,63 @@ func fitRun(family string, bold, italic bool, size, pdfWidth float64, text strin
 // trackingFor returns the font size and per-character tracking (points) that
 // make measured ink match pdfWidth. Spacing is applied between characters,
 // not after the last one.
-// isLato reports a Canva Lato face. PowerPoint 2016 does not download the
-// Lato cloud font (that starts with Office 2019). A missing latin face is
-// substituted from the theme, which is Calibri. Carlito has Calibri's metrics.
-func isLato(family string) bool {
-	return strings.Contains(strings.ToLower(family), "lato")
+
+// officeCloudFonts are faces Microsoft 365 downloads on demand into
+// AppData\Local\Microsoft\FontCache\4\CloudFonts. The PDF advances are
+// that face, so the typeface name stays and spc stays near zero.
+// Faces that are not in this list still fall back to Calibri or the
+// local metric match.
+var officeCloudFonts = []string{
+	"lato",
+	"anton",
+	"montserrat",
+	"open sans",
+	"roboto",
+	"poppins",
+	"oswald",
+	"raleway",
+	"nunito",
+	"inter",
+	"source sans",
 }
 
-func latoIsBold(family string, bold bool) bool {
+func isOfficeCloudFont(family string) bool {
 	n := strings.ToLower(family)
-	return bold || strings.Contains(n, "black") || strings.Contains(n, "heavy") || strings.Contains(n, "bold")
+	n = strings.ReplaceAll(n, "-", " ")
+	for _, f := range officeCloudFonts {
+		if strings.Contains(n, f) {
+			return true
+		}
+	}
+	return false
 }
 
-// fitLatoToCalibri sets Calibri and the character spacing that makes
-// PowerPoint's advance end at the next glyph's PDF x. The box itself is
-// not moved or widened. Spacing is between characters, matching a:rPr spc.
-func fitLatoToCalibri(p *Page) {
-	var refs []textRef
+// fitCloudFontSpacing sets a:rPr spc from the real font, when that font
+// is installed here, against the PDF width. Lato is not installed on the
+// build machine; its PDF widths already match the cloud font, so spc
+// stays 0. The typeface name is not rewritten.
+func fitCloudFontSpacing(p *Page) {
 	for i := range p.Elements {
 		t := p.Elements[i].Text
-		if t == nil || t.Vertical || !horizontal(t.Rotation) {
+		if t == nil || t.Vertical || !isOfficeCloudFont(t.FontName) || t.Width < 0.5 || strings.TrimSpace(t.Content) == "" {
 			continue
 		}
-		refs = append(refs, textRef{i, t})
-	}
-	sortRefs(refs)
-	for i := range refs {
-		t := refs[i].t
-		if t.RTL || !isLato(t.FontName) || t.Width < 0.5 || strings.TrimSpace(t.Content) == "" {
-			continue
-		}
-		if len(t.Runs) > 1 {
-			uniform := true
-			for _, r := range t.Runs {
-				if !isLato(r.FontName) || math.Abs(r.FontSize-t.FontSize) > math.Max(t.FontSize*0.08, 0.4) {
-					uniform = false
-					break
-				}
-			}
-			if !uniform {
-				continue
-			}
-			t.Runs = nil
-		}
-		target := t.Width
-		for j := i + 1; j < len(refs); j++ {
-			n := refs[j].t
-			if !sameLine(t, n) || n.X <= t.X+0.5 {
-				continue
-			}
-			if n.X-t.X < target {
-				target = n.X - t.X
-			}
-			break
-		}
-		bold := latoIsBold(t.FontName, t.Bold)
-		italic := t.Italic || strings.Contains(strings.ToLower(t.FontName), "italic") || strings.Contains(strings.ToLower(t.FontName), "oblique")
-		path, _, ok := matchSystemFont("Carlito", bold, italic)
-		if !ok {
+		path, resolved, ok := matchSystemFont(t.FontName, t.Bold, t.Italic)
+		if !ok || !fontNamesClose(t.FontName, resolved) {
+			t.Tracking = 0
 			continue
 		}
 		measured, covered := measureText(path, t.FontSize, t.Content)
 		if !covered || measured < 0.5 {
+			t.Tracking = 0
 			continue
 		}
 		gaps := utf8.RuneCountInString(t.Content) - 1
-		if gaps < 1 {
-			if target > 0.5 {
-				t.FontSize *= target / measured
-			}
+		if gaps < 1 || math.Abs(measured-t.Width)/t.Width < 0.015 {
 			t.Tracking = 0
-		} else {
-			sp := math.Round((target-measured)/float64(gaps)*100) / 100
-			t.Tracking = sp
+			continue
 		}
-		t.FontName = "Calibri"
-		t.Bold = bold
-		t.Italic = italic
+		t.Tracking = math.Round((t.Width-measured)/float64(gaps)*100) / 100
 	}
 }
 

@@ -140,7 +140,10 @@ func contiguous(g []textRef, t *TextObject) bool {
 	prev := g[len(g)-1].t
 	// An uncovered parenthesis keeps the x it was drawn at. Merging it
 	// back into the run on either side paints it on top of z₁.
-	if prev.holdX || t.holdX {
+	// A comma beside a Hebrew word is one phrase. holdX would leave it
+	// as its own box and open a gap (בניווט sat 16.6 pt from באיתור;
+	// v1.5.3 had 6.65 pt).
+	if (prev.holdX || t.holdX) && !punctBesideHebrew(prev, t) {
 		return false
 	}
 	// "t " is the last letter of "nonprofit", painted at its own PDF x.
@@ -282,6 +285,21 @@ func nearestBody(ts []*TextObject, i int) *TextObject {
 		}
 	}
 	return nil
+}
+
+func punctBesideHebrew(a, b *TextObject) bool {
+	// A bullet stays its own box so a one-letter prefix (ו) still
+	// concatenates onto the next word ("ולוודא").
+	ac, bc := commaish(a.Content), commaish(b.Content)
+	if ac == bc {
+		return false
+	}
+	return hasRTLScript(a.Content) || hasRTLScript(b.Content)
+}
+
+func commaish(s string) bool {
+	s = strings.TrimSpace(s)
+	return s == "," || s == "،" || s == ":"
 }
 
 func isSpacer(s string) bool {
@@ -982,10 +1000,10 @@ func pullBackOverlaps(p *Page) {
 		// points. Only a real collision (Andy through Morodo) is pulled back.
 		// Never move the next box. v1.5.4 parked it on this box's right
 		// edge, and every later word shifted ("youregistered", kaist p18).
-		// Lato is drawn in Calibri, spaced to this PDF width. Shortening
-		// the box clips the last letter; widening it lets that letter
-		// run into the next word.
-		if isLato(a.FontName) {
+		// A cloud font is drawn at the PDF width. Shortening the box
+		// clips the last letter; widening it lets that letter run
+		// into the next word.
+		if isOfficeCloudFont(a.FontName) {
 			continue
 		}
 		wordEdge := strings.HasSuffix(a.Content, " ") || strings.HasPrefix(b.Content, " ")

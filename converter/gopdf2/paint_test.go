@@ -392,6 +392,24 @@ func TestHebrewReadingOrder(t *testing.T) {
 			pageText.WriteString(tb.Content)
 			all.WriteString(tb.Content)
 		}
+		if i == 12 {
+			var baitor, binyan *TextObject
+			for _, tb := range pg.TextObjects {
+				if strings.Contains(tb.Content, "באיתור") {
+					baitor = tb
+				}
+				if strings.Contains(tb.Content, "בניווט") {
+					binyan = tb
+				}
+			}
+			if baitor == nil || binyan == nil {
+				t.Fatal("page 13 lost באיתור or בניווט")
+			}
+			gap := binyan.X - (baitor.X + baitor.Width)
+			if gap < 4 || gap > 10 {
+				t.Fatalf("page 13 gap %.1f, want about 6.7", gap)
+			}
+		}
 		if at := touchAt(pageText.String()); at >= 0 {
 			s := pageText.String()
 			lo, hi := at-8, at+12
@@ -515,12 +533,12 @@ func TestCanvaRotaryWordsAreNotClipped(t *testing.T) {
 			t.Fatalf("page 16 lost %q", word)
 		}
 	}
-	// Lato is drawn as Calibri, spaced so the advance equals the PDF width.
-	// A wider substitute otherwise runs "nonprofit" into "organizations".
+	// Microsoft 365 has Lato. The run keeps that name and no extra spacing,
+	// so the cloud font's own advances land on the PDF x.
 	for _, word := range []string{"nonprofit ", "Account ", "not-for-profit "} {
 		var tb *TextObject
 		for _, c := range p.TextObjects {
-			if c.Content == word {
+			if strings.TrimSpace(c.Content) == strings.TrimSpace(word) {
 				tb = c
 				break
 			}
@@ -528,37 +546,11 @@ func TestCanvaRotaryWordsAreNotClipped(t *testing.T) {
 		if tb == nil {
 			t.Fatalf("missing %q", word)
 		}
-		if tb.FontName != "Calibri" {
+		if !isOfficeCloudFont(tb.FontName) || tb.FontName == "Calibri" || tb.FontName == "Noto Sans" {
 			t.Fatalf("%q font %q", word, tb.FontName)
 		}
-		path, _, ok := matchSystemFont("Carlito", tb.Bold, tb.Italic)
-		if !ok {
-			t.Fatal("carlito missing")
-		}
-		measured, covered := measureText(path, tb.FontSize, tb.Content)
-		if !covered {
-			t.Fatalf("%q unmeasured", word)
-		}
-		gaps := len([]rune(tb.Content)) - 1
-		got := measured
-		if gaps > 0 {
-			got += tb.Tracking * float64(gaps)
-		}
-		// The advance ends at the next word's PDF x, not past it.
-		limit := tb.Width
-		for _, n := range p.TextObjects {
-			if n == tb || n.X <= tb.X+0.5 {
-				continue
-			}
-			if math.Abs((n.Y+n.FontSize)-(tb.Y+tb.FontSize)) > math.Max(1.25, tb.FontSize*0.18) {
-				continue
-			}
-			if n.X-tb.X < limit {
-				limit = n.X - tb.X
-			}
-		}
-		if math.Abs(got-limit) > 1.5 {
-			t.Fatalf("%q calibri %.1f, room %.1f", word, got, limit)
+		if math.Abs(tb.Tracking) > 0.05 {
+			t.Fatalf("%q tracking %.2f", word, tb.Tracking)
 		}
 	}
 }

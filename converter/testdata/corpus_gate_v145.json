@@ -1,6 +1,6 @@
 {
   "source": "v1.4.5",
-  "note": "Picture count, picture area, unique Latin tokens, concatenated a:t tokens, and a size ceiling for every manifest deck whose URL still returns a PDF. tsmc-2q25-zh is blocked; its correct concatenated token count is 261 (the footer is © 2025 TSMC, Ltd). korea-privacy and nrcs-cattle-distiller are also blocked. Decks added in v1.5.0 use that release's PPTX size as the ceiling. Renders are LibreOffice page images.",
+  "note": "Picture count, picture area, unique Latin tokens, concatenated a:t tokens, and a size ceiling for every manifest deck whose URL still returns a PDF. tsmc-2q25-zh is blocked; its correct concatenated token count is 261 (the footer is \u00a9 2025 TSMC, Ltd). korea-privacy and nrcs-cattle-distiller are also blocked. Decks added in v1.5.0 use that release's PPTX size as the ceiling. Renders are LibreOffice page images.",
   "decks": {
     "aist-ohno": {
       "pics": 51,
@@ -321,7 +321,8 @@
     {
       "name": "aist-ohno-p1",
       "id": "aist-ohno",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 8.18
     },
     {
       "name": "beamer-flip-p1",
@@ -331,42 +332,50 @@
     {
       "name": "beamer-mcgill-p1",
       "id": "beamer-mcgill",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.44
     },
     {
       "name": "bjedu-2024b-p1",
       "id": "bjedu-2024b",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 4.7
     },
     {
       "name": "bjedu-2026-p1",
       "id": "bjedu-2026",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 15.59
     },
     {
       "name": "bjedu-kyc-p1",
       "id": "bjedu-kyc",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 5.52
     },
     {
       "name": "canva-mahidol-adv-p1",
       "id": "canva-mahidol-adv",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.24
     },
     {
       "name": "canva-rotary-p1",
       "id": "canva-rotary",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.82
     },
     {
       "name": "cdc-nbs-m365-p1",
       "id": "cdc-nbs-m365",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 3.53
     },
     {
       "name": "cesar2025-ai-p1",
       "id": "cesar2025-ai",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.7
     },
     {
       "name": "ecss24-harman-p1",
@@ -376,22 +385,26 @@
     {
       "name": "gzmtu-ppt-2013-p1",
       "id": "gzmtu-ppt-2013",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.64
     },
     {
       "name": "kaist-xai-p1",
       "id": "kaist-xai",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 3.94
     },
     {
       "name": "kust-pressure-p1",
       "id": "kust-pressure",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 10.57
     },
     {
       "name": "libo-cjk-p1",
       "id": "libo-cjk",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 5.56
     },
     {
       "name": "macadmins-autopkg-google-p1",
@@ -401,7 +414,8 @@
     {
       "name": "mine-safety-p1",
       "id": "mine-safety",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 9.94
     },
     {
       "name": "mit-datamgmt-p1",
@@ -411,12 +425,14 @@
     {
       "name": "mit-ocw-ses1-p1",
       "id": "mit-ocw-ses1",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 8.71
     },
     {
       "name": "nbs-alibaba-p1",
       "id": "nbs-alibaba",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 3.4
     },
     {
       "name": "neurips-effxfmr-p1",
@@ -426,32 +442,38 @@
     {
       "name": "nhsa-ypsw-p1",
       "id": "nhsa-ypsw",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 8.62
     },
     {
       "name": "psumac-keynote-p1",
       "id": "psumac-keynote",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 3.5
     },
     {
       "name": "psumac-keynote-p30",
       "id": "psumac-keynote",
-      "page": 30
+      "page": 30,
+      "maxAbsErr": 2.04
     },
     {
       "name": "saasopen-google-p1",
       "id": "saasopen-google",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 5.17
     },
     {
       "name": "tencent-4q24-p1",
       "id": "tencent-4q24",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.27
     },
     {
       "name": "tx-hhs-word-p1",
       "id": "tx-hhs-word",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 6.12
     },
     {
       "name": "uab-isc2-2016-p1",
@@ -461,7 +483,8 @@
     {
       "name": "uab-reo-m365-p1",
       "id": "uab-reo-m365",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.9
     },
     {
       "name": "uai2025-keynote-p1",
@@ -481,22 +504,26 @@
     {
       "name": "wps-demo-case-p1",
       "id": "wps-demo-case",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 3.47
     },
     {
       "name": "wps-tutorial-p1",
       "id": "wps-tutorial",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 1.23
     },
     {
       "name": "wps-tutorial-p2",
       "id": "wps-tutorial",
-      "page": 2
+      "page": 2,
+      "maxAbsErr": 1.4
     },
     {
       "name": "wps-tutorial-p4",
       "id": "wps-tutorial",
-      "page": 4
+      "page": 4,
+      "maxAbsErr": 10.4
     },
     {
       "name": "jp-tategaki-p1",
@@ -516,12 +543,14 @@
     {
       "name": "arcourts-ppt-p1",
       "id": "arcourts-ppt",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 2.65
     },
     {
       "name": "wps-office2019-p1",
       "id": "wps-office2019",
-      "page": 1
+      "page": 1,
+      "maxAbsErr": 2.37
     },
     {
       "name": "oicw-1996-scan-p1",
@@ -531,17 +560,20 @@
     {
       "name": "kaist-xai-p18",
       "id": "kaist-xai",
-      "page": 18
+      "page": 18,
+      "maxAbsErr": 22.58
     },
     {
       "name": "canva-rotary-p8",
       "id": "canva-rotary",
-      "page": 8
+      "page": 8,
+      "maxAbsErr": 5.35
     },
     {
       "name": "canva-rotary-p16",
       "id": "canva-rotary",
-      "page": 16
+      "page": 16,
+      "maxAbsErr": 7.34
     },
     {
       "name": "he-openu-a11y-p13",

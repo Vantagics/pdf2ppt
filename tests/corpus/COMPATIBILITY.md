@@ -1,5 +1,13 @@
 # Compatibility notes
 
+## v1.4.2
+
+JPEG pictures stay JPEG. A clip is `a:srcRect` on a DCT image and a real crop on a PNG. A deck more than 10% larger than its v1.4.0 PPTX fails `TestPictureCountBaseline`. Local corpus total is 213 MB, down from 256 MB in v1.4.0.
+
+UNDP rings and the chevron band use the handle box again, so the curves are not clamped. Clips still follow the curve, and a trim under 2% does not move the picture. NBS/Alibaba page 4 paints the four category panels as axial shadings.
+
+korea-privacy is not in the local corpus. Its recall gap versus v1.3.9 is the widened text boxes, which stay rolled back. Tiles that miss their cell stay dropped.
+
 ## v1.4.1
 
 Non-page clips crop the picture again (NeurIPS chart footer, PSUMAC). A page clip only trims slide overflow. Pattern tiles outside their cell are dropped, so gzmtu and nbs picture counts match v1.3.7. Text tokens match v1.3.7 on the Rotary, Mahidol, and WPS decks. TencentSansW7 is bold.

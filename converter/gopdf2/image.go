@@ -71,6 +71,7 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 
 	out := image.NewNRGBA(img.Bounds())
 	b := img.Bounds()
+	anyAlpha := false
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
 			r, g, bv, a := img.At(x, y).RGBA()
@@ -80,6 +81,9 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 			}
 			if opacity < 0.999 {
 				alpha = byte(float64(alpha) * opacity)
+			}
+			if alpha != 255 {
+				anyAlpha = true
 			}
 			rr, gg, bb := byte(r>>8), byte(g>>8), byte(bv>>8)
 			// An SMask Matte means the color was premultiplied with that
@@ -92,6 +96,14 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 		}
 	}
 	var buf bytes.Buffer
+	// A DCT photo that only needed a soft-mask composite, and came out opaque,
+	// stays a JPEG. Logos and diagrams that were never JPEG stay PNG.
+	if !anyAlpha && isJPEG(raw) && b.Dx()*b.Dy() >= 128*128 {
+		if err := jpeg.Encode(&buf, out, &jpeg.Options{Quality: 92}); err != nil {
+			return nil, "", err
+		}
+		return buf.Bytes(), "jpeg", nil
+	}
 	if err := png.Encode(&buf, out); err != nil {
 		return nil, "", err
 	}
@@ -102,9 +114,8 @@ func isJPEG(b []byte) bool {
 	return len(b) > 3 && b[0] == 0xFF && b[1] == 0xD8
 }
 
-// cropEncodedImage trims an encoded image by fractions of its width and height
-// measured from each edge. left/right/top/bottom are 0..1. Top is the first
-// row of the bitmap.
+// cropEncodedImage trims a non-JPEG bitmap. DCT photos are not passed
+// through here: a clip on those is a:srcRect, so the original bytes stay.
 func cropEncodedImage(data []byte, left, top, right, bottom float64) ([]byte, string, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
@@ -333,9 +344,22 @@ func numberList(xrd *model.XRefTable, o types.Object) []float64 {
 	return out
 }
 
-// flattenOn composites a PNG onto a solid color and returns an opaque PNG.
-// PowerPoint has composited PNG alpha against black, which turns a
-// translucent light watermark into a gray page.
+// pngHasAlpha reports whether a PNG can composite against the slide.
+// JPEG bytes and opaque RGB PNGs cannot.
+func pngHasAlpha(data []byte) bool {
+	if len(data) < 26 || string(data[:8]) != "\x89PNG\r\n\x1a\n" {
+		return false
+	}
+	switch data[25] {
+	case 4, 6:
+		return true
+	}
+	return bytes.Contains(data, []byte("tRNS"))
+}
+
+// flattenOn composites an image onto a solid color. A large result is a JPEG
+// so a page photo is not stored as a PNG. A small result stays PNG (logos,
+// the unit test's 2×2 watermark).
 func flattenOn(data []byte, bgR, bgG, bgB byte) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
@@ -357,6 +381,12 @@ func flattenOn(data []byte, bgR, bgG, bgB byte) ([]byte, error) {
 		}
 	}
 	var buf bytes.Buffer
+	if b.Dx()*b.Dy() >= 128*128 {
+		if err := jpeg.Encode(&buf, out, &jpeg.Options{Quality: 92}); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}
 	if err := png.Encode(&buf, out); err != nil {
 		return nil, err
 	}

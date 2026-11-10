@@ -124,6 +124,11 @@ type ImageElement struct {
 	Width    float64 `json:"width"`
 	Height   float64 `json:"height"`
 	Rotation float64 `json:"rotation,omitempty"`
+	// Crop fractions of the source bitmap, matching DrawingML a:srcRect.
+	CropL float64 `json:"cropL,omitempty"`
+	CropT float64 `json:"cropT,omitempty"`
+	CropR float64 `json:"cropR,omitempty"`
+	CropB float64 `json:"cropB,omitempty"`
 }
 
 // PageContent 一个 PDF 页面中提取的所有元素集合.

@@ -161,6 +161,10 @@ func imageFromPDF(imgObj *gopdf2.ImageObject) ImageElement {
 		Width:    imgObj.Width,
 		Height:   imgObj.Height,
 		Rotation: imgObj.Rotation,
+		CropL:    imgObj.CropL,
+		CropT:    imgObj.CropT,
+		CropR:    imgObj.CropR,
+		CropB:    imgObj.CropB,
 	}
 }
 

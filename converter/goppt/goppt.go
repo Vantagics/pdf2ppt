@@ -114,6 +114,9 @@ type Image struct {
 	Width    int64   // Width in EMU
 	Height   int64   // Height in EMU
 	Rotation float64 // clockwise degrees
+	// CropL, CropT, CropR, CropB are fractions (0..1) of the bitmap removed
+	// from the left, top, right, and bottom. Written as a:srcRect.
+	CropL, CropT, CropR, CropB float64
 }
 
 func (i *Image) elementType() string { return "image" }

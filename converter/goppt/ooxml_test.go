@@ -37,3 +37,18 @@ func TestTextOutline(t *testing.T) {
 		t.Fatalf("negative rotation was not normalized: %s", vert)
 	}
 }
+
+func TestImageSrcRect(t *testing.T) {
+	xml := formatImage(&Image{
+		X: 1, Y: 2, Width: 100, Height: 80,
+		CropL: 0.1, CropT: 0.2, CropR: 0.3, CropB: 0.4,
+	}, 1, 1)
+	want := `<a:srcRect l="10000" t="20000" r="30000" b="40000"/>`
+	if !strings.Contains(xml, want) {
+		t.Fatalf("srcRect missing: %s", xml)
+	}
+	plain := formatImage(&Image{X: 1, Y: 2, Width: 100, Height: 80}, 2, 1)
+	if strings.Contains(plain, "srcRect") {
+		t.Fatalf("uncropped picture grew a srcRect: %s", plain)
+	}
+}

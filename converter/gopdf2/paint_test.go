@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"math"
 	"os"
@@ -48,6 +49,114 @@ func TestFlattenKeepsLightWatermark(t *testing.T) {
 	rr, gg, bb, aa := img.At(0, 0).RGBA()
 	if aa>>8 != 255 || rr>>8 < 230 || gg>>8 < 230 || bb>>8 < 230 {
 		t.Fatalf("flattened pixel = %d %d %d a=%d", rr>>8, gg>>8, bb>>8, aa>>8)
+	}
+}
+
+func TestClipKeepsJPEGBytes(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, src, &jpeg.Options{Quality: 80}); err != nil {
+		t.Fatal(err)
+	}
+	raw := append([]byte(nil), buf.Bytes()...)
+	ip := &interp{pageW: 100, pageH: 100}
+	ip.elements = []PageElement{{Image: &ImageObject{
+		Data: raw, Format: "jpeg", X: -10, Y: 10, Width: 50, Height: 40,
+	}}}
+	// Page clip: only the part that hangs off the slide is trimmed, and the
+	// bytes stay the original JPEG.
+	ip.clipLastImage(0, 0, 100, 100, false)
+	img := ip.elements[0].Image
+	if img.Format != "jpeg" || !bytes.Equal(img.Data, raw) {
+		t.Fatalf("format %s len %d, jpeg was re-encoded", img.Format, len(img.Data))
+	}
+	if img.CropL < 0.15 || img.CropL > 0.25 {
+		t.Fatalf("CropL = %v, want about 0.2", img.CropL)
+	}
+	if img.X < -0.1 || img.X > 0.1 {
+		t.Fatalf("cropped X = %v, want 0", img.X)
+	}
+}
+
+func TestShapeBoxHoldsHandlesClipBoxDoesNot(t *testing.T) {
+	// Endpoints sit on y=0. The handles are at y=40. The curve itself peaks
+	// at 30, which is what a clip should use. The shape box has to contain
+	// the handles or DrawingML clamps them flat.
+	ops := []pathOp{{op: 'M', x: 0, y: 0}, {op: 'C', x: 10, y: 0, x1: 0, y1: 40, x2: 10, y2: 40}}
+	_, y0, _, y1, ok := pathBounds(ops)
+	if !ok || y0 > 0.1 || y1 < 39 {
+		t.Fatalf("shape bounds y %.2f..%.2f", y0, y1)
+	}
+	_, cy0, _, cy1, ok := clipBounds(ops)
+	if !ok || cy1 > 31 || cy1 < 29 || cy0 < -0.1 {
+		t.Fatalf("clip bounds y %.2f..%.2f", cy0, cy1)
+	}
+}
+
+func TestOnePercentClipDoesNotMoveThePicture(t *testing.T) {
+	ip := &interp{pageW: 200, pageH: 200}
+	ip.elements = []PageElement{{Image: &ImageObject{
+		Data: []byte{1}, Format: "png", X: 0, Y: 0, Width: 100, Height: 80,
+	}}}
+	ip.clipLastImage(1, 0, 100, 80, false)
+	img := ip.elements[0].Image
+	if img.CropL != 0 || math.Abs(img.Width-100) > 0.1 || math.Abs(img.X) > 0.1 {
+		t.Fatalf("1%% clip moved the picture: x %.2f w %.2f cropL %.3f", img.X, img.Width, img.CropL)
+	}
+}
+
+func TestDirectShadingBecomesCard(t *testing.T) {
+	content := "10 10 80 40 re W n /Sh0 sh\n"
+	p := openPDF(t, pdfBytes([]string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Resources << /Shading << /Sh0 5 0 R >> >> /Contents 4 0 R >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
+		"<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [0 0 0 100] /Function << /FunctionType 2 /Domain [0 1] /C0 [0.22 0.22 0.22] /C1 [0 0 0] /N 1 >> >>",
+	}))
+	var card *ShapeObject
+	for _, el := range p.Elements {
+		if el.Shape != nil && el.Shape.Gradient != nil {
+			card = el.Shape
+		}
+	}
+	if card == nil {
+		t.Fatal("shading was not painted")
+	}
+	if math.Abs(card.Width-80) > 1 || math.Abs(card.Height-40) > 1 {
+		t.Fatalf("card box %.1fx%.1f", card.Width, card.Height)
+	}
+	if len(card.Gradient.Stops) < 2 || card.Gradient.Stops[0].R < 50 || card.Gradient.Stops[len(card.Gradient.Stops)-1].R > 5 {
+		t.Fatalf("stops %+v", card.Gradient.Stops)
+	}
+	// t=0 is the bottom (y-up). DrawingML direction toward black is upward, 270°.
+	if math.Abs(card.Gradient.Angle-270) > 1 {
+		t.Fatalf("angle %v", card.Gradient.Angle)
+	}
+}
+
+func TestNBSCardsAreGradients(t *testing.T) {
+	doc, err := Open("/tmp/corpus/nbs-alibaba.pdf")
+	if err != nil {
+		t.Skip(err)
+	}
+	p, err := doc.GetPage(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cards int
+	for _, el := range p.Elements {
+		sh := el.Shape
+		if sh == nil || sh.Gradient == nil || sh.Width < 400 || sh.Height < 200 {
+			continue
+		}
+		cards++
+		if sh.Gradient.Stops[0].R < 40 {
+			t.Fatalf("card starts at %d, want the gray panel", sh.Gradient.Stops[0].R)
+		}
+	}
+	if cards != 4 {
+		t.Fatalf("gradient cards = %d, want 4", cards)
 	}
 }
 
@@ -234,9 +343,12 @@ func TestMITSlidePaint(t *testing.T) {
 	if len(p.Images) == 0 {
 		t.Fatal("no background image")
 	}
-	img, err := png.Decode(bytes.NewReader(p.Images[0].Data))
+	img, _, err := image.Decode(bytes.NewReader(p.Images[0].Data))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if p.Images[0].Format != "jpeg" {
+		t.Fatalf("page photo format %s, want jpeg", p.Images[0].Format)
 	}
 	rr, gg, bb, aa := img.At(img.Bounds().Dx()/2, img.Bounds().Dy()/2).RGBA()
 	if aa>>8 != 255 || rr>>8 < 220 || gg>>8 < 220 || bb>>8 < 220 {

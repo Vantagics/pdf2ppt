@@ -493,7 +493,9 @@ func (ip *interp) exec(op string, st *[]token) {
 	case "W", "W*":
 		// The path becomes the clip. A later image is cropped to this rectangle,
 		// which drops the NeurIPS tweet that is drawn outside its card.
-		if x0, y0, x1, y1, ok := pathBounds(ip.ops); ok {
+		// Extrema, not control points: a rounded corner's handles sit outside
+		// the curve and used to keep the NeurIPS chart footer inside the clip.
+		if x0, y0, x1, y1, ok := clipBounds(ip.ops); ok {
 			if ip.gs.hasClip {
 				if x0 < ip.gs.clipX0 {
 					x0 = ip.gs.clipX0
@@ -588,6 +590,8 @@ func (ip *interp) exec(op string, st *[]token) {
 		ip.showString(raw, 0)
 	case "Do":
 		ip.doXObject(popName(st))
+	case "sh":
+		ip.paintShading(popName(st))
 	case "BMC":
 		popName(st)
 		if ip.ocSkip > 0 {
@@ -1171,7 +1175,21 @@ func hasCurve(ops []pathOp) bool {
 	return false
 }
 
+// pathBounds is the geometry box of a painted shape. It includes Bézier
+// control points so the box contains every handle. DrawingML clamps path
+// points to the box, and a handle outside the box pulls a ring or a chevron
+// off the curve (the UNDP ornamental band).
 func pathBounds(ops []pathOp) (minX, minY, maxX, maxY float64, ok bool) {
+	return boundsOf(ops, true)
+}
+
+// clipBounds is the rectangle a clip actually covers. Control points of a
+// rounded corner sit outside the curve; using them kept the NeurIPS footer.
+func clipBounds(ops []pathOp) (minX, minY, maxX, maxY float64, ok bool) {
+	return boundsOf(ops, false)
+}
+
+func boundsOf(ops []pathOp, includeControls bool) (minX, minY, maxX, maxY float64, ok bool) {
 	minX, minY = math.MaxFloat64, math.MaxFloat64
 	maxX, maxY = -math.MaxFloat64, -math.MaxFloat64
 	consider := func(x, y float64) {
@@ -1198,12 +1216,17 @@ func pathBounds(ops []pathOp) (minX, minY, maxX, maxY float64, ok bool) {
 			cx, cy = o.x, o.y
 			have = true
 		case 'C':
+			if includeControls {
+				consider(o.x1, o.y1)
+				consider(o.x2, o.y2)
+				consider(o.x, o.y)
+				cx, cy = o.x, o.y
+				have = true
+				continue
+			}
 			if !have {
 				cx, cy = o.x1, o.y1
 			}
-			// Control points sit outside a rounded corner. The box of the
-			// controls is taller than the curve and keeps the footer under
-			// the NeurIPS chart. Use the curve's own extremes.
 			xLo, xHi := bezExtrema(cx, o.x1, o.x2, o.x)
 			yLo, yHi := bezExtrema(cy, o.y1, o.y2, o.y)
 			consider(xLo, yLo)
@@ -1844,6 +1867,17 @@ func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64, dropOutside bool
 		}
 		return
 	}
+	area := img.Width * img.Height
+	if area < 1 {
+		return
+	}
+	outside := 1 - (cx1-cx0)*(cy1-cy0)/area
+	// A tile that mostly sits in its cell keeps its bitmap. Cropping every
+	// edge tile shaved the UNDP chevron band and the left-edge dots. A tile
+	// that misses the cell was already removed above.
+	if dropOutside && outside < 0.36 {
+		return
+	}
 	// Only axis-aligned placements can be cropped by a rectangle.
 	if img.Width < 0.5 || img.Height < 0.5 || math.Abs(img.Rotation) > 0.4 {
 		return
@@ -1852,12 +1886,29 @@ func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64, dropOutside bool
 	right := (imgMaxX - cx1) / img.Width
 	top := (imgMaxY - cy1) / img.Height
 	bottom := (cy0 - imgMinY) / img.Height
-	cropped, format, err := cropEncodedImage(img.Data, left, top, right, bottom)
-	if err != nil || len(cropped) == 0 {
+	// A trim under 2% is an edge shave. The UNDP portrait's clip removes
+	// about 1% and cropping it shifted the frame. A real window, such as
+	// the NeurIPS footer, removes more than that.
+	if left < 0.02 && top < 0.02 && right < 0.02 && bottom < 0.02 {
 		return
 	}
-	img.Data = cropped
-	img.Format = format
+	// Sub-point trims are rounding. Leave the JPEG bytes and the box alone.
+	const minTrim = 0.4
+	if cx0-imgMinX < minTrim && imgMaxX-cx1 < minTrim && imgMaxY-cy1 < minTrim && cy0-imgMinY < minTrim {
+		return
+	}
+	// A DCT photo is cropped with a:srcRect so the original bytes stay.
+	// Re-encoding those as PNG is what grew the corpus by 87%. A PNG or a
+	// decoded diagram is cropped in the file; keeping the uncropped bitmap
+	// (UAI's repeated slides) is larger than the trimmed picture.
+	if isJPEG(img.Data) {
+		img.CropL, img.CropT, img.CropR, img.CropB = left, top, right, bottom
+	} else if cropped, format, err := cropEncodedImage(img.Data, left, top, right, bottom); err != nil || len(cropped) == 0 {
+		return
+	} else {
+		img.Data = cropped
+		img.Format = format
+	}
 	img.X = cx0 - ip.originX
 	img.Y = (ip.originY + ip.pageH) - cy1
 	img.Width = cx1 - cx0
@@ -1903,6 +1954,98 @@ func lastPatternName(content []byte) string {
 		}
 	}
 	return ""
+}
+
+// paintShading draws a shading resource clipped to the current path.
+// PowerPoint cards such as the NBS/Alibaba panels are axial shadings
+// inside a rectangle, not a flat page color.
+func (ip *interp) paintShading(name string) {
+	if ip.ocSkip > 0 || name == "" || !ip.gs.hasClip {
+		return
+	}
+	g := ip.res.directShading(name, ip.gs.ctm)
+	if g == nil {
+		return
+	}
+	minX, minY := ip.gs.clipX0, ip.gs.clipY0
+	maxX, maxY := ip.gs.clipX1, ip.gs.clipY1
+	if maxX-minX < 1 || maxY-minY < 1 {
+		return
+	}
+	if !ip.seenContent && ip.coversPage(minX, minY, maxX, maxY) && ip.bgGrad == nil {
+		ip.hasBg = true
+		ip.bgGrad = g
+		ip.seenContent = true
+		return
+	}
+	sh := &ShapeObject{
+		X:          minX - ip.originX,
+		Y:          (ip.originY + ip.pageH) - maxY,
+		Width:      maxX - minX,
+		Height:     maxY - minY,
+		HasFill:    true,
+		FillAlpha:  ip.gs.fillAlpha,
+		Gradient:   g,
+		SimpleRect: true,
+	}
+	if sh.FillAlpha <= 0 {
+		sh.FillAlpha = 1
+	}
+	ip.seenContent = true
+	ip.elements = append(ip.elements, PageElement{Shape: sh})
+}
+
+func (r *resources) directShading(name string, ctm matrix) *Gradient {
+	if r == nil || name == "" {
+		return nil
+	}
+	pd := r.sub("Shading")
+	if pd == nil {
+		if r.parent != nil {
+			return r.parent.directShading(name, ctm)
+		}
+		return nil
+	}
+	o, ok := pd.Find(name)
+	if !ok {
+		if r.parent != nil {
+			return r.parent.directShading(name, ctm)
+		}
+		return nil
+	}
+	sh, err := r.xrd.DereferenceDict(o)
+	if err != nil || sh == nil {
+		return nil
+	}
+	stops := shadingStops(r.xrd, sh)
+	if len(stops) < 2 {
+		return nil
+	}
+	shadeType := intEntry(r.xrd, sh, "ShadingType")
+	coords := sh.ArrayEntry("Coords")
+	if shadeType == 3 && len(coords) >= 6 {
+		return &Gradient{Kind: "radial", Stops: stops}
+	}
+	if shadeType != 2 || len(coords) < 4 {
+		return nil
+	}
+	nums := make([]float64, 4)
+	for i := 0; i < 4; i++ {
+		n, ok := objNum(r.xrd, coords[i])
+		if !ok {
+			return nil
+		}
+		nums[i] = n
+	}
+	x0, y0 := ctm.apply(nums[0], nums[1])
+	x1, y1 := ctm.apply(nums[2], nums[3])
+	// Same convention as axialPattern: DrawingML angles are clockwise from +x.
+	ang := math.Atan2(y1-y0, x1-x0) * 180 / math.Pi
+	clockwise := -ang
+	for clockwise < 0 {
+		clockwise += 360
+	}
+	return &Gradient{Angle: clockwise, Kind: "linear", Stops: stops}
 }
 
 func (r *resources) axialPattern(name string, ctm matrix) *Gradient {
@@ -2225,13 +2368,19 @@ func (ip *interp) paintImage(xo *xobject) {
 	}
 	// A page-sized translucent image is the slide background. Bake it onto
 	// the page color so PowerPoint cannot composite the PNG alpha against black.
-	if ip.coversPage(minX, minY, maxX, maxY) {
+	// An opaque JPEG is already the background; decoding it only to write a PNG
+	// is what inflated the decks.
+	if ip.coversPage(minX, minY, maxX, maxY) && pngHasAlpha(data) {
 		br, bgc, bb := byte(255), byte(255), byte(255)
 		if ip.hasBg && ip.bgGrad == nil {
 			br, bgc, bb = ip.bg.bytes()
 		}
 		if flat, ferr := flattenOn(data, br, bgc, bb); ferr == nil && len(flat) > 0 {
-			data, format = flat, "png"
+			data = flat
+			format = "png"
+			if isJPEG(flat) {
+				format = "jpeg"
+			}
 		}
 	}
 	img := &ImageObject{

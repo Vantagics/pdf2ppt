@@ -100,6 +100,10 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				Width:    PointsToEMU(ie.Width),
 				Height:   PointsToEMU(ie.Height),
 				Rotation: ie.Rotation,
+				CropL:    ie.CropL,
+				CropT:    ie.CropT,
+				CropR:    ie.CropR,
+				CropB:    ie.CropB,
 			}
 			if err := slide.AddImage(img); err != nil {
 				log.Printf("warning: failed to add image %d: %v", i, err)

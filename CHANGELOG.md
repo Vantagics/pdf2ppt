@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.2
+
+A clip no longer decodes a JPEG and writes it back as a PNG. DCT bytes pass through, and the crop is an `a:srcRect`. A PNG is still cropped in the file, because keeping the uncropped bitmap was larger (the UAI repeats). A page-sized JPEG with no alpha is not flattened. A soft-masked photo that comes out opaque is a JPEG again. `TestPictureCountBaseline` fails when a deck is more than 10% larger than its stored v1.4.0 size.
+
+On the local corpus the PPTX total is 213,162,773 bytes, against 256,019,440 for v1.4.0 (−16.7%). No deck grew by more than 10%.
+
+Shape boxes include Bézier handles again, so DrawingML does not clamp a ring or a chevron flat. Clip boxes still use the curve itself, so the NeurIPS footer stays cropped. A clip that removes less than 2% of a picture is left alone (the UNDP frame). A pattern tile that mostly sits in its cell is not shaved. Tiles that miss the cell are still dropped.
+
+`sh` paints an axial shading clipped to the current rectangle. The NBS/Alibaba category panels are that gradient (gray 56 down to black), not the flat black page.
+
+The korea-privacy recall gap versus v1.3.9 is the widened text boxes from that release. Those boxes collided columns and stay at the v1.3.7 width. The eight missing pictures are tiles that miss their cell; the same rule is what keeps gzmtu and nbs from the duplicate-tile bloat. That PDF is not in the local corpus, so the count was not remeasured here.
+
 ## 1.4.1
 
 A rectangular clip crops the picture to that rectangle again, so the NeurIPS adoption chart loses the footer and the junk URL that v1.4.0 let back in. A clip that is the page only trims what hangs off the slide, which keeps the Canva diamonds. A picture that misses the clip is not deleted. A pattern tile that misses its cell is still dropped, so gzmtu and nbs-alibaba are not bloated with duplicate tiles.

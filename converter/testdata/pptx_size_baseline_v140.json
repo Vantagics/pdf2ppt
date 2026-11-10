@@ -1,0 +1,27 @@
+{
+  "source": "v1.4.0",
+  "note": "Byte size of the PPTX written from the local corpus. A later build fails the picture baseline test when a deck is more than 10% larger.",
+  "bytes": {
+    "canva": 17005390,
+    "cdc": 5732020,
+    "gzmtu": 14417943,
+    "imperial": 7172015,
+    "kaist": 826716,
+    "kust": 122607,
+    "ltu-gslides": 226737,
+    "mine": 14724496,
+    "nbs": 15293778,
+    "nbs-alibaba": 15293778,
+    "neurips": 12175108,
+    "nv-ada": 860169,
+    "psumac": 89077439,
+    "saasopen": 10438412,
+    "tencent": 5608990,
+    "tx-hhs": 267242,
+    "uab-isc": 7003252,
+    "uab-reo": 5023188,
+    "uai": 25670775,
+    "undp": 9042728,
+    "wps": 36657
+  }
+}

@@ -388,6 +388,18 @@ func formatImage(img *Image, id int, imageIdx int) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(`<p:pic><p:nvPicPr><p:cNvPr id="%d" name="Image %d"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>`, id, id))
 	sb.WriteString(fmt.Sprintf(`<p:blipFill><a:blip r:embed="rImg%d"/>`, imageIdx))
+	if img.CropL > 0.0005 || img.CropT > 0.0005 || img.CropR > 0.0005 || img.CropB > 0.0005 {
+		pct := func(v float64) int {
+			if v < 0 {
+				v = 0
+			}
+			if v > 1 {
+				v = 1
+			}
+			return int(math.Round(v * 100000))
+		}
+		sb.WriteString(fmt.Sprintf(`<a:srcRect l="%d" t="%d" r="%d" b="%d"/>`, pct(img.CropL), pct(img.CropT), pct(img.CropR), pct(img.CropB)))
+	}
 	sb.WriteString(`<a:stretch><a:fillRect/></a:stretch></p:blipFill>`)
 	rot := ""
 	if math.Abs(img.Rotation) > 0.4 {

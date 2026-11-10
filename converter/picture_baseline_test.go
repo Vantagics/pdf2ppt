@@ -48,6 +48,15 @@ func TestPictureCountBaseline(t *testing.T) {
 				t.Fatal(err)
 			}
 			pics, area := pptxPictures(t, out)
+			if base, ok := sizeBaseline[name]; ok && base > 0 {
+				st, err := os.Stat(out)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if st.Size() > int64(float64(base)*1.10) {
+					t.Fatalf("pptx is %d bytes, more than 10%% over the v1.4.0 size %d", st.Size(), base)
+				}
+			}
 			if pics < want.Pics {
 				t.Fatalf("p:pic %d, v1.3.7 baseline %d", pics, want.Pics)
 			}
@@ -69,6 +78,65 @@ func TestPictureCountBaseline(t *testing.T) {
 	}
 	if found == 0 {
 		t.Skip("no corpus PDFs in /tmp/corpus")
+	}
+}
+
+// sizeBaseline is the v1.4.0 PPTX size in bytes. v1.4.1 re-encoded JPEG
+// photos as PNG and the corpus grew by 87%. A deck may shrink. It may not
+// grow by more than 10%.
+var sizeBaseline map[string]int64
+
+func init() {
+	raw, err := os.ReadFile("testdata/pptx_size_baseline_v140.json")
+	if err != nil {
+		return
+	}
+	var doc struct {
+		Bytes map[string]int64 `json:"bytes"`
+	}
+	if json.Unmarshal(raw, &doc) == nil {
+		sizeBaseline = doc.Bytes
+	}
+}
+
+func TestPPTXSizeBaseline(t *testing.T) {
+	if len(sizeBaseline) == 0 {
+		t.Skip("no size baseline")
+	}
+	raw, err := os.ReadFile("testdata/picture_baseline_v137.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pics pictureBaseline
+	if err := json.Unmarshal(raw, &pics); err != nil {
+		t.Fatal(err)
+	}
+	found := 0
+	for name, base := range sizeBaseline {
+		if _, ok := pics.Decks[name]; ok {
+			continue // checked while counting pictures
+		}
+		pdf := corpusPDF(name)
+		if pdf == "" {
+			continue
+		}
+		found++
+		t.Run(name, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "out.pptx")
+			if _, err := NewConverter(nil).Convert(pdf, out); err != nil {
+				t.Fatal(err)
+			}
+			st, err := os.Stat(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st.Size() > int64(float64(base)*1.10) {
+				t.Fatalf("pptx is %d bytes, more than 10%% over the v1.4.0 size %d", st.Size(), base)
+			}
+		})
+	}
+	if found == 0 {
+		t.Skip("no extra corpus PDFs")
 	}
 }
 

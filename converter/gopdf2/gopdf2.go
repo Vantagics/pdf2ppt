@@ -90,6 +90,9 @@ type ImageObject struct {
 	Width    float64
 	Height   float64
 	Rotation float64 // clockwise degrees, matching DrawingML
+	// CropL, CropT, CropR, CropB are fractions of the source bitmap removed
+	// from each edge (DrawingML a:srcRect). The placement box is the remainder.
+	CropL, CropT, CropR, CropB float64
 }
 
 // PathOp is one command of a shape outline in shape-local, y-down points.

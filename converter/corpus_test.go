@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-// TestChromeSkiaSlide prints tests/corpus/slides.html with headless Chrome.
-// The producer is Skia/PDF, the same backend Google Slides uses. The page has
-// a gradient, a rounded card, rotated text, and Chinese.
+// TestChromeSkiaSlide prints tests/corpus/slides.html with headless Chrome
+// (Skia/PDF). Page 1 is the 120° gradient whose axis used to be flipped.
+// Later pages cover other linear angles, a radial shading, and body text.
 func TestChromeSkiaSlide(t *testing.T) {
 	for _, bin := range []string{"google-chrome", "soffice", "pdftoppm", "python3"} {
 		if _, err := exec.LookPath(bin); err != nil {
@@ -24,7 +24,7 @@ func TestChromeSkiaSlide(t *testing.T) {
 	html := filepath.Join(root, "tests", "corpus", "slides.html")
 	work := t.TempDir()
 	pdf := filepath.Join(work, "slides.pdf")
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	chrome := exec.CommandContext(ctx, "google-chrome", "--headless", "--disable-gpu", "--no-sandbox",
 		"--no-pdf-header-footer",
@@ -57,11 +57,24 @@ func TestChromeSkiaSlide(t *testing.T) {
 	if err := exec.Command("pdftoppm", "-png", "-r", "72", filepath.Join(rtDir, "slides.pdf"), filepath.Join(rtPNG, "page")).Run(); err != nil {
 		t.Fatal(err)
 	}
-	score := ssimFile(t, filepath.Join(srcPNG, "page-1.png"), filepath.Join(rtPNG, "page-1.png"))
-	t.Logf("chrome/skia slide 1 SSIM %.4f", score)
-	if score < 0.90 {
-		t.Fatalf("SSIM %.4f, want >= 0.90", score)
+	// Page 1 is the 120° multi-stop gradient plus the rotated label. The other
+	// linear pages are different angles and stop counts. The radial page is a
+	// centered circle. The last page is columns/table text, where antialiasing
+	// dominates and is not the gradient regression.
+	mins := []float64{0.99, 0.98, 0.98, 0.98, 0.97}
+	for i, min := range mins {
+		a := filepath.Join(srcPNG, fmtPage(i+1))
+		b := filepath.Join(rtPNG, fmtPage(i+1))
+		score := ssimFile(t, a, b)
+		t.Logf("chrome/skia slide %d SSIM %.4f", i+1, score)
+		if score < min {
+			t.Fatalf("slide %d SSIM %.4f, want >= %.2f", i+1, score, min)
+		}
 	}
+}
+
+func fmtPage(n int) string {
+	return "page-" + strconv.Itoa(n) + ".png"
 }
 
 func ssimFile(t *testing.T, a, b string) float64 {

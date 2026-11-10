@@ -83,7 +83,8 @@ type GradStop struct {
 
 // Gradient is an axial blend recovered from a PDF shading pattern.
 type Gradient struct {
-	Angle float64 // clockwise degrees, for DrawingML
+	Angle float64 // clockwise degrees, for a linear DrawingML fill
+	Kind  string  // "linear" or "radial"
 	Stops []GradStop
 }
 

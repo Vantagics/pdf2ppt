@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.1
+
+The Chrome/Skia slide gradient was mirrored top to bottom. The shading axis was transformed by both the pattern matrix and the paint-time CTM. Poppler applies the pattern matrix in the content stream's base space and cancels the CTM, so the extra multiply flipped the axis: yellow climbed into the top-right and the navy region shrank. Stop positions and the −18° label geometry were already right; the flipped background made the label look shifted. The white chip's centroid now matches the source within a fraction of a pixel.
+
+LibreOffice's `a:lin` with `scaled="1"` matches this CSS-style axis on a 16:9 page (corner colors within about two levels). No separate PowerPoint-only gradient was required.
+
+The same path covers other linear angles, a four-stop blend, and a centered radial shading (PDF type 3).
+
+| Page | Before (v1.1.0) | After |
+| --- | ---: | ---: |
+| 120° gradient, rotated label, Chinese | 0.959 | 0.991 |
+| 90° linear | — | 0.994 |
+| 0° linear, three stops | — | 0.995 |
+| 45° linear, four stops | — | 0.996 |
+| centered radial | — | 0.996 |
+
 ## 1.1.0
 
 Compatibility pass against real slide PDFs, not only the generated fixtures from 1.0.0.

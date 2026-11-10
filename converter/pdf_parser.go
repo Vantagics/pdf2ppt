@@ -173,7 +173,7 @@ func gradientFromPDF(g *gopdf2.Gradient) *GradientFill {
 	if g == nil || len(g.Stops) == 0 {
 		return nil
 	}
-	out := &GradientFill{Angle: g.Angle}
+	out := &GradientFill{Angle: g.Angle, Kind: g.Kind}
 	for _, s := range g.Stops {
 		out.Stops = append(out.Stops, GradientStop{Pos: s.Pos, R: s.R, G: s.G, B: s.B})
 	}

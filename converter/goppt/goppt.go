@@ -78,6 +78,7 @@ type GradientStop struct {
 // Gradient is a linear fill.
 type Gradient struct {
 	Angle float64
+	Kind  string // "linear" (default) or "radial"
 	Stops []GradientStop
 }
 

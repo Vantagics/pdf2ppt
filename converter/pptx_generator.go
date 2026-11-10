@@ -33,7 +33,7 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 
 	slide := g.ppt.AddSlide(widthEMU, heightEMU)
 	if content.BgGradient != nil && len(content.BgGradient.Stops) >= 2 {
-		g := &goppt.Gradient{Angle: content.BgGradient.Angle}
+		g := &goppt.Gradient{Angle: content.BgGradient.Angle, Kind: content.BgGradient.Kind}
 		for _, s := range content.BgGradient.Stops {
 			g.Stops = append(g.Stops, goppt.GradientStop{Pos: s.Pos, R: s.R, G: s.G, B: s.B})
 		}
@@ -102,7 +102,7 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				SimpleRect:  sh.SimpleRect,
 			}
 			if sh.Gradient != nil && len(sh.Gradient.Stops) >= 2 {
-				out.Gradient = &goppt.Gradient{Angle: sh.Gradient.Angle}
+				out.Gradient = &goppt.Gradient{Angle: sh.Gradient.Angle, Kind: sh.Gradient.Kind}
 				for _, s := range sh.Gradient.Stops {
 					out.Gradient.Stops = append(out.Gradient.Stops, goppt.GradientStop{Pos: s.Pos, R: s.R, G: s.G, B: s.B})
 				}

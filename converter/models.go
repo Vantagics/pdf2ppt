@@ -84,6 +84,7 @@ type GradientStop struct {
 // GradientFill is a linear gradient recovered from a PDF shading.
 type GradientFill struct {
 	Angle float64        `json:"angle"`
+	Kind  string         `json:"kind,omitempty"`
 	Stops []GradientStop `json:"stops"`
 }
 

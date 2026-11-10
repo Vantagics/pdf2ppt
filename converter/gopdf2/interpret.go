@@ -283,12 +283,16 @@ type interp struct {
 	haveCur          bool
 	pageW, pageH     float64
 	originX, originY float64
-	seenContent      bool
-	hasBg            bool
-	bg               color3
-	bgGrad           *Gradient
-	elements         []PageElement
-	formDepth        int
+	// baseCTM is the transform in effect at the start of the current content
+	// stream. Shading pattern matrices map into that space; the cm operators
+	// that follow must not be applied again (PDF viewers cancel them).
+	baseCTM     matrix
+	seenContent bool
+	hasBg       bool
+	bg          color3
+	bgGrad      *Gradient
+	elements    []PageElement
+	formDepth   int
 }
 
 func interpretPage(content []byte, res *resources, originX, originY, width, height float64) *Page {
@@ -301,6 +305,7 @@ func interpretPage(content []byte, res *resources, originX, originY, width, heig
 		pageH:   height,
 		originX: originX,
 		originY: originY,
+		baseCTM: ident(),
 	}
 	if len(content) > 0 {
 		ip.execContent(content)
@@ -408,7 +413,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		ip.popColor(st, ip.gs.fillN, true)
 	case "scn":
 		if len(*st) > 0 && (*st)[len(*st)-1].kind == tkName {
-			ip.gs.fillGrad = ip.res.axialPattern(popName(st), ip.gs.ctm)
+			ip.gs.fillGrad = ip.res.axialPattern(popName(st), ip.baseCTM)
 		} else {
 			ip.popColor(st, ip.gs.fillN, true)
 		}
@@ -1021,11 +1026,20 @@ func (r *resources) axialPattern(name string, ctm matrix) *Gradient {
 		return nil
 	}
 	sh, err := r.xrd.DereferenceDict(shObj)
-	if err != nil || sh == nil || intEntry(r.xrd, sh, "ShadingType") != 2 {
+	if err != nil || sh == nil {
 		return nil
 	}
+	shadeType := intEntry(r.xrd, sh, "ShadingType")
 	coords := sh.ArrayEntry("Coords")
-	if len(coords) < 4 {
+	if shadeType == 3 && len(coords) >= 6 {
+		stops := shadingStops(r.xrd, sh)
+		if len(stops) < 2 {
+			return nil
+		}
+		// A type-3 shading whose two circles share a center is a plain radial blend.
+		return &Gradient{Kind: "radial", Stops: stops}
+	}
+	if shadeType != 2 || len(coords) < 4 {
 		return nil
 	}
 	nums := make([]float64, 4)
@@ -1052,6 +1066,9 @@ func (r *resources) axialPattern(name string, ctm matrix) *Gradient {
 			pm = matrix{mm[0], mm[1], mm[2], mm[3], mm[4], mm[5]}
 		}
 	}
+	// ctm here is the content stream's base transform, not the CTM at the
+	// paint operator. Chrome stores the full page mapping in the pattern
+	// matrix; multiplying by the paint-time CTM flips the axis.
 	x0, y0 := ctm.apply(pm.apply(nums[0], nums[1]))
 	x1, y1 := ctm.apply(pm.apply(nums[2], nums[3]))
 	ang := math.Atan2(y1-y0, x1-x0) * 180 / math.Pi
@@ -1064,7 +1081,7 @@ func (r *resources) axialPattern(name string, ctm matrix) *Gradient {
 	if len(stops) < 2 {
 		return nil
 	}
-	return &Gradient{Angle: clockwise, Stops: stops}
+	return &Gradient{Angle: clockwise, Kind: "linear", Stops: stops}
 }
 
 func shadingStops(xrd *model.XRefTable, sh types.Dict) []GradStop {
@@ -1185,10 +1202,12 @@ func (ip *interp) doXObject(name string) {
 		savedOps := ip.ops
 		savedIn := ip.inText
 		savedTM, savedTLM := ip.tm, ip.tlm
+		savedBase := ip.baseCTM
 		ip.formDepth++
 		ip.ops = nil
 		ip.inText = false
 		ip.gs.ctm = concat(xo.matrix, ip.gs.ctm)
+		ip.baseCTM = ip.gs.ctm
 		if xo.res != nil {
 			ip.res = xo.res
 		}
@@ -1201,6 +1220,7 @@ func (ip *interp) doXObject(name string) {
 		ip.ops = savedOps
 		ip.inText = savedIn
 		ip.tm, ip.tlm = savedTM, savedTLM
+		ip.baseCTM = savedBase
 	}
 }
 

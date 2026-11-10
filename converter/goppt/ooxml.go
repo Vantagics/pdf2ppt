@@ -190,7 +190,13 @@ func formatGradFill(g *Gradient) string {
 		}
 		sb.WriteString(fmt.Sprintf(`<a:gs pos="%d"><a:srgbClr val="%02X%02X%02X"/></a:gs>`, pos, s.R, s.G, s.B))
 	}
-	sb.WriteString(fmt.Sprintf(`</a:gsLst><a:lin ang="%d" scaled="1"/></a:gradFill>`, ang))
+	if g.Kind == "radial" {
+		// pos 0 is the center, matching a PDF type-3 shading whose t=0 circle is the focus.
+		sb.WriteString(`</a:gsLst><a:path path="circle"><a:fillToRect l="50000" t="50000" r="50000" b="50000"/></a:path></a:gradFill>`)
+	} else {
+		// scaled="1" fits the axis to the shape, which is how CSS sizes a linear-gradient on a box.
+		sb.WriteString(fmt.Sprintf(`</a:gsLst><a:lin ang="%d" scaled="1"/></a:gradFill>`, ang))
+	}
 	return sb.String()
 }
 

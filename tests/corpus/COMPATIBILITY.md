@@ -1,5 +1,15 @@
 # Compatibility notes
 
+## v1.3.9
+
+Soft-masked pictures are no longer folded into the background. Picture counts match v1.3.7 on the local corpus (Mahidol slide 1 is 4 pictures, SaaSOpen slide 1 is 5, Tencent slide 1 is 2). Rectangular clips crop images, which is why NeurIPS page 19 no longer shows the tweet above the Manhattan render and why the page 8 icon stops before the "8".
+
+The Tencent wordmark is an opaque RGB picture, white on the blue behind it. The v1.3.8 background PNG already contained those white pixels; this build keeps them as a separate picture with no alpha.
+
+Canva captions that were doubled per letter join into the word (`Realistic`, `Sustainability`).
+
+Still open: UNDP Arabic labels whose ToUnicode map only contains comma and percent; a Keynote Type 1C icon with no ToUnicode is still `$`.
+
 ## v1.3.8
 
 Ten more decks are in `manifest.json` (NeurIPS Google Slides, two Beijing statistics decks, NBS/Alibaba, Korean PowerPoint, UNDP Arabic, another WPS file, a Japanese Google deck, and a Canva workshop).

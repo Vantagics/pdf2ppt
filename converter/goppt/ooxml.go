@@ -170,7 +170,15 @@ func formatTextBox(tb *TextBox, id int) string {
 		}
 		rot = fmt.Sprintf(` rot="%d"`, int64(math.Round(deg*60000)))
 	}
-	sb.WriteString(fmt.Sprintf(`<p:spPr><a:xfrm%s><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, rot, tb.X, tb.Y, clampExtent(tb.Width), clampExtent(tb.Height)))
+	// A single line must not wrap or clip. The box is the PDF advance, which
+	// is short of PowerPoint's glyph widths, so the last letters get cut.
+	// Extra width is on the right only: shifting the box left would slide
+	// the first glyph under a neighboring picture.
+	pad := int64(math.Round(tb.FontSize * 0.4 * 12700))
+	if pad < 0 {
+		pad = 0
+	}
+	sb.WriteString(fmt.Sprintf(`<p:spPr><a:xfrm%s><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, rot, tb.X, tb.Y, clampExtent(tb.Width+pad), clampExtent(tb.Height)))
 	sb.WriteString(`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr>`)
 	sb.WriteString(`<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t" horzOverflow="overflow" vertOverflow="overflow"/>`)
 	sb.WriteString(`<a:lstStyle/>`)

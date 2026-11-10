@@ -67,6 +67,9 @@ type gstate struct {
 	leading, rise          float64
 	render                 int
 	font                   *pdfFont
+	hasClip                bool
+	clipX0, clipY0         float64
+	clipX1, clipY1         float64
 }
 
 // tileFill is a PatternType 1 cell whose content is one or more images.
@@ -480,7 +483,26 @@ func (ip *interp) exec(op string, st *[]token) {
 		h, w, y, x := popN4(st)
 		ip.rectPath(x, y, w, h)
 	case "W", "W*":
-		// clipping is recorded only so the following paint/n consumes the path
+		// The path becomes the clip. A later image is cropped to this rectangle,
+		// which drops the NeurIPS tweet that is drawn outside its card.
+		if x0, y0, x1, y1, ok := pathBounds(ip.ops); ok {
+			if ip.gs.hasClip {
+				if x0 < ip.gs.clipX0 {
+					x0 = ip.gs.clipX0
+				}
+				if y0 < ip.gs.clipY0 {
+					y0 = ip.gs.clipY0
+				}
+				if x1 > ip.gs.clipX1 {
+					x1 = ip.gs.clipX1
+				}
+				if y1 > ip.gs.clipY1 {
+					y1 = ip.gs.clipY1
+				}
+			}
+			ip.gs.hasClip = true
+			ip.gs.clipX0, ip.gs.clipY0, ip.gs.clipX1, ip.gs.clipY1 = x0, y0, x1, y1
+		}
 	case "n":
 		ip.ops = nil
 		ip.haveCur = false
@@ -1644,7 +1666,7 @@ func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64) {
 		return
 	}
 	// Only axis-aligned placements can be cropped by a rectangle.
-	if img.Width < 0.5 || img.Height < 0.5 {
+	if img.Width < 0.5 || img.Height < 0.5 || math.Abs(img.Rotation) > 0.4 {
 		return
 	}
 	left := (cx0 - imgMinX) / img.Width
@@ -2003,6 +2025,9 @@ func (ip *interp) paintImage(xo *xobject) {
 	}
 	ip.seenContent = true
 	ip.elements = append(ip.elements, PageElement{Image: img})
+	if ip.gs.hasClip {
+		ip.clipLastImage(ip.gs.clipX0, ip.gs.clipY0, ip.gs.clipX1, ip.gs.clipY1)
+	}
 }
 
 // ---- tokenizer ----

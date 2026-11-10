@@ -31,19 +31,25 @@ func mergeTextLines(p *Page) {
 	}
 	sortRefs(refs)
 	var groups [][]textRef
+	remove := map[int]bool{}
 	for _, r := range refs {
 		if len(groups) == 0 {
 			groups = append(groups, []textRef{r})
 			continue
 		}
 		g := groups[len(groups)-1]
+		if sameLine(g[0].t, r.t) && duplicateOverlap(g[len(g)-1].t, r.t) {
+			// Canva paints every letter twice. The second copy must not start
+			// a new word, or "R e e a" becomes the boxes "Re" and "ea".
+			remove[r.i] = true
+			continue
+		}
 		if sameLine(g[0].t, r.t) && contiguous(g, r.t) {
 			groups[len(groups)-1] = append(g, r)
 			continue
 		}
 		groups = append(groups, []textRef{r})
 	}
-	remove := map[int]bool{}
 	for _, g := range groups {
 		if len(g) < 2 {
 			continue
@@ -107,6 +113,18 @@ func sameLine(a, b *TextObject) bool {
 	return math.Abs(baseline(a)-baseline(b)) <= math.Max(1.25, em*0.18)
 }
 
+func duplicateOverlap(prev, t *TextObject) bool {
+	if prev.Content == "" || prev.Content != t.Content {
+		return false
+	}
+	gap := t.X - (prev.X + prev.Width)
+	if gap >= 0 {
+		return false
+	}
+	shorter := math.Min(prev.Width, t.Width)
+	return shorter > 0 && -gap > shorter*0.55
+}
+
 func contiguous(g []textRef, t *TextObject) bool {
 	prev := g[len(g)-1].t
 	gap := t.X - (prev.X + prev.Width)
@@ -118,7 +136,10 @@ func contiguous(g []textRef, t *TextObject) bool {
 		overlap := -gap
 		shorter := math.Min(prev.Width, t.Width)
 		if shorter > 0 && overlap > shorter*0.55 {
-			return false
+			// A second copy of the same string is a duplicate (handled before
+			// this). Different text piled on the same spot is the next letter
+			// of a Canva word, whose boxes overlap by more than half.
+			return prev.Content != t.Content
 		}
 	}
 	return gap <= em*0.85
@@ -226,8 +247,17 @@ func isSpacer(s string) bool {
 
 func coalesce(ts []*TextObject) []TextRun {
 	var runs []TextRun
-	push := func(r TextRun) {
+	push := func(r TextRun, overlap bool) {
 		if r.Content == "" {
+			return
+		}
+		if n := len(runs); n > 0 && overlap {
+			// Canva bigrams change size by a point or two. They are still one word.
+			runs[n-1].Content = stitchRunes(runs[n-1].Content, r.Content)
+			if r.FontSize > runs[n-1].FontSize {
+				runs[n-1].FontSize = r.FontSize
+				runs[n-1].FontName = r.FontName
+			}
 			return
 		}
 		if n := len(runs); n > 0 && sameStyle(runs[n-1], r) {
@@ -237,6 +267,7 @@ func coalesce(ts []*TextObject) []TextRun {
 		runs = append(runs, r)
 	}
 	for i, t := range ts {
+		overlap := false
 		if i > 0 {
 			prev := ts[i-1]
 			gap := t.X - (prev.X + prev.Width)
@@ -244,27 +275,43 @@ func coalesce(ts []*TextObject) []TextRun {
 			if em < 1 {
 				em = t.FontSize
 			}
+			shorter := math.Min(prev.Width, t.Width)
+			overlap = gap < 0 && shorter > 0 && -gap > shorter*0.25
 			// 0.15 em is under a normal word space (~0.25 em) and above the
 			// negative gaps between Canva's per-letter boxes. 0.22 em dropped
 			// "Getty images" (gap 0.21 em) and "Amadeu Pons".
-			if gap > em*0.15 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
+			if !overlap && gap > em*0.15 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
 				push(TextRun{
 					Content: " ", FontName: prev.FontName, FontSize: prev.FontSize,
 					Bold: prev.Bold, Italic: prev.Italic,
 					ColorR: prev.ColorR, ColorG: prev.ColorG, ColorB: prev.ColorB,
-				})
+				}, false)
 			}
 		}
 		push(TextRun{
 			Content: t.Content, FontName: t.FontName, FontSize: t.FontSize,
 			Bold: t.Bold, Italic: t.Italic,
 			ColorR: t.ColorR, ColorG: t.ColorG, ColorB: t.ColorB,
-		})
+		}, overlap)
 	}
 	if len(runs) == 0 {
 		runs = []TextRun{{Content: ""}}
 	}
 	return runs
+}
+
+func stitchRunes(a, b string) string {
+	ar, br := []rune(a), []rune(b)
+	kmax := len(ar)
+	if len(br) < kmax {
+		kmax = len(br)
+	}
+	for k := kmax; k >= 1; k-- {
+		if string(ar[len(ar)-k:]) == string(br[:k]) {
+			return a + string(br[k:])
+		}
+	}
+	return a + b
 }
 
 func cjkBoundary(left, right string) bool {

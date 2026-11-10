@@ -7,58 +7,116 @@ import (
 	"image/png"
 )
 
-// bakeAlphaOverlays composites a translucent image onto the opaque image
-// underneath it. PowerPoint composites PNG alpha against black, so a white
-// wordmark (the Tencent logo) is drawn black even when the PNG pixels are white.
-func bakeAlphaOverlays(p *Page) {
-	drop := map[int]bool{}
+// opacifyLightMasks flattens a mostly-transparent light wordmark onto the
+// picture behind it and stores that as an opaque PNG. The picture stays in
+// the slide. PowerPoint has drawn this file's white RGBA wordmark as black
+// (it treats the four channels like a mask); an opaque RGB picture has no
+// mask to misread. Other translucent pictures are left alone: folding every
+// soft image into the background is what deleted logos in v1.3.8.
+func opacifyLightMasks(p *Page) {
 	for i := range p.Elements {
-		baseEl := p.Elements[i].Image
-		if baseEl == nil || drop[i] {
+		overEl := p.Elements[i].Image
+		if overEl == nil {
+			continue
+		}
+		over, err := decodeRGBA(overEl.Data)
+		if err != nil || over == nil || !lightMask(over) {
+			continue
+		}
+		baseEl, base := backdrop(p, i, overEl)
+		if base == nil {
+			continue
+		}
+		flat := image.NewNRGBA(over.Bounds())
+		sampleBackdrop(flat, over, overEl, base, baseEl)
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, flat); err != nil {
+			continue
+		}
+		overEl.Data = buf.Bytes()
+		overEl.Format = "png"
+	}
+}
+
+func backdrop(p *Page, i int, over *ImageObject) (*ImageObject, *image.NRGBA) {
+	for j := i - 1; j >= 0; j-- {
+		baseEl := p.Elements[j].Image
+		if baseEl == nil || !boxInside(over, baseEl, 2) {
 			continue
 		}
 		base, err := decodeRGBA(baseEl.Data)
 		if err != nil || base == nil {
 			continue
 		}
-		changed := false
-		for j := i + 1; j < len(p.Elements); j++ {
-			overEl := p.Elements[j].Image
-			if overEl == nil || drop[j] {
+		return baseEl, base
+	}
+	return nil, nil
+}
+
+// lightMask is a wordmark: most pixels are clear and the visible pixels are
+// near-white. A photograph with a soft edge is mostly opaque and is kept.
+func lightMask(img *image.NRGBA) bool {
+	b := img.Bounds()
+	n := b.Dx() * b.Dy()
+	if n < 16 {
+		return false
+	}
+	var clear, opaque int
+	var r, g, bl int64
+	for y := 0; y < b.Dy(); y++ {
+		for x := 0; x < b.Dx(); x++ {
+			c := img.NRGBAAt(x, y)
+			if c.A < 16 {
+				clear++
 				continue
 			}
-			if !boxInside(overEl, baseEl, 2) {
+			if c.A < 200 {
 				continue
 			}
-			over, err := decodeRGBA(overEl.Data)
-			if err != nil || over == nil || !hasTransparency(over) {
-				continue
+			opaque++
+			r += int64(c.R)
+			g += int64(c.G)
+			bl += int64(c.B)
+		}
+	}
+	if opaque < 8 || clear*2 < n {
+		return false
+	}
+	return r/int64(opaque) > 200 && g/int64(opaque) > 200 && bl/int64(opaque) > 200
+}
+
+func sampleBackdrop(dst, src *image.NRGBA, srcBox *ImageObject, base *image.NRGBA, baseBox *ImageObject) {
+	sw, sh := src.Bounds().Dx(), src.Bounds().Dy()
+	bw, bh := base.Bounds().Dx(), base.Bounds().Dy()
+	for y := 0; y < sh; y++ {
+		py := srcBox.Y + (float64(y)+0.5)/float64(sh)*srcBox.Height
+		by := int((py - baseBox.Y) / baseBox.Height * float64(bh))
+		if by < 0 {
+			by = 0
+		}
+		if by >= bh {
+			by = bh - 1
+		}
+		for x := 0; x < sw; x++ {
+			s := src.NRGBAAt(x, y)
+			px := srcBox.X + (float64(x)+0.5)/float64(sw)*srcBox.Width
+			bx := int((px - baseBox.X) / baseBox.Width * float64(bw))
+			if bx < 0 {
+				bx = 0
 			}
-			blitOver(base, baseEl, over, overEl)
-			drop[j] = true
-			changed = true
+			if bx >= bw {
+				bx = bw - 1
+			}
+			d := base.NRGBAAt(bx, by)
+			af := float64(s.A) / 255
+			dst.SetNRGBA(x, y, color.NRGBA{
+				R: byte(float64(s.R)*af + float64(d.R)*(1-af)),
+				G: byte(float64(s.G)*af + float64(d.G)*(1-af)),
+				B: byte(float64(s.B)*af + float64(d.B)*(1-af)),
+				A: 255,
+			})
 		}
-		if !changed {
-			continue
-		}
-		var buf bytes.Buffer
-		if err := png.Encode(&buf, base); err != nil {
-			continue
-		}
-		baseEl.Data = buf.Bytes()
-		baseEl.Format = "png"
 	}
-	if len(drop) == 0 {
-		return
-	}
-	kept := p.Elements[:0]
-	for i, el := range p.Elements {
-		if drop[i] {
-			continue
-		}
-		kept = append(kept, el)
-	}
-	p.Elements = kept
 }
 
 func decodeRGBA(data []byte) (*image.NRGBA, error) {
@@ -77,22 +135,6 @@ func decodeRGBA(data []byte) (*image.NRGBA, error) {
 	return out, nil
 }
 
-func hasTransparency(img *image.NRGBA) bool {
-	b := img.Bounds()
-	step := 1
-	if b.Dx()*b.Dy() > 40000 {
-		step = 4
-	}
-	for y := 0; y < b.Dy(); y += step {
-		for x := 0; x < b.Dx(); x += step {
-			if img.NRGBAAt(x, y).A < 250 {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func boxInside(inner, outer *ImageObject, slop float64) bool {
 	if outer.Width < 1 || outer.Height < 1 || inner.Width < 1 || inner.Height < 1 {
 		return false
@@ -100,49 +142,4 @@ func boxInside(inner, outer *ImageObject, slop float64) bool {
 	return inner.X >= outer.X-slop && inner.Y >= outer.Y-slop &&
 		inner.X+inner.Width <= outer.X+outer.Width+slop &&
 		inner.Y+inner.Height <= outer.Y+outer.Height+slop
-}
-
-func blitOver(dst *image.NRGBA, dstBox *ImageObject, src *image.NRGBA, srcBox *ImageObject) {
-	dw, dh := dst.Bounds().Dx(), dst.Bounds().Dy()
-	sw, sh := src.Bounds().Dx(), src.Bounds().Dy()
-	if dw < 1 || dh < 1 || sw < 1 || sh < 1 {
-		return
-	}
-	x0 := int((srcBox.X - dstBox.X) / dstBox.Width * float64(dw))
-	y0 := int((srcBox.Y - dstBox.Y) / dstBox.Height * float64(dh))
-	x1 := int((srcBox.X + srcBox.Width - dstBox.X) / dstBox.Width * float64(dw))
-	y1 := int((srcBox.Y + srcBox.Height - dstBox.Y) / dstBox.Height * float64(dh))
-	if x1 <= x0 || y1 <= y0 {
-		return
-	}
-	for y := y0; y < y1; y++ {
-		if y < 0 || y >= dh {
-			continue
-		}
-		sy := (y - y0) * sh / (y1 - y0)
-		if sy < 0 || sy >= sh {
-			continue
-		}
-		for x := x0; x < x1; x++ {
-			if x < 0 || x >= dw {
-				continue
-			}
-			sx := (x - x0) * sw / (x1 - x0)
-			if sx < 0 || sx >= sw {
-				continue
-			}
-			s := src.NRGBAAt(sx, sy)
-			if s.A == 0 {
-				continue
-			}
-			d := dst.NRGBAAt(x, y)
-			af := float64(s.A) / 255
-			dst.SetNRGBA(x, y, color.NRGBA{
-				R: byte(float64(s.R)*af + float64(d.R)*(1-af)),
-				G: byte(float64(s.G)*af + float64(d.G)*(1-af)),
-				B: byte(float64(s.B)*af + float64(d.B)*(1-af)),
-				A: 255,
-			})
-		}
-	}
 }

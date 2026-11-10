@@ -1,0 +1,77 @@
+{
+  "source": "v1.3.7",
+  "decks": {
+    "canva": {
+      "pics": 41,
+      "area": 3181561081882985,
+      "areaSlack": 0.3
+    },
+    "cdc": {
+      "pics": 82,
+      "area": 1488010393144210
+    },
+    "imperial": {
+      "pics": 171,
+      "area": 715766785700513
+    },
+    "kust": {
+      "pics": 8,
+      "area": 12960840392244
+    },
+    "ltu-gslides": {
+      "pics": 29,
+      "area": 15646764784586
+    },
+    "mine": {
+      "pics": 309,
+      "area": 1708781062517746
+    },
+    "neurips": {
+      "pics": 123,
+      "area": 1204045188714400,
+      "areaSlack": 0.1
+    },
+    "nv-ada": {
+      "pics": 28,
+      "area": 190227048462054
+    },
+    "psumac": {
+      "pics": 140,
+      "area": 15909459051184256,
+      "areaSlack": 0.05
+    },
+    "saasopen": {
+      "pics": 61,
+      "area": 477785675455181
+    },
+    "tencent": {
+      "pics": 157,
+      "area": 639620128278624
+    },
+    "tx-hhs": {
+      "pics": 4,
+      "area": 29353425430065
+    },
+    "uab-isc": {
+      "pics": 228,
+      "area": 3716712610121636
+    },
+    "uab-reo": {
+      "pics": 66,
+      "area": 1473967810384521
+    },
+    "undp": {
+      "pics": 40,
+      "area": 389532433951129
+    },
+    "wps": {
+      "pics": 0,
+      "area": 0
+    },
+    "canva-mahidol": {
+      "pics": 41,
+      "area": 3014995195350119,
+      "areaSlack": 0.1
+    }
+  }
+}

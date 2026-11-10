@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.9
+
+v1.3.8 composited every soft-masked picture into the image behind it and then deleted the picture. 24 decks lost logos and title art that way (the Mahidol Thai banner, the Railsware mark, the Beijing soft waves). That compositing is gone. A stored v1.3.7 baseline checks that `p:pic` counts do not fall; area may fall only where a clip crops overflow, and those decks are named in the baseline.
+
+The Tencent wordmark PNG is white (255,255,255) with a straight alpha. v1.3.8 baked those white pixels into the background and PowerPoint still drew the mark black, so the bake was not the fix. The mark is its own picture again, with the alpha removed: the letters are opaque white on the blue sampled behind them (PNG color type 2, no alpha channel).
+
+A rectangular clip is applied to the next image. The NeurIPS page 19 tweet is the top of a JPEG that the clip cuts off, and the page 8 ChatGPT icon no longer covers the leading 8 of "800 million". Text boxes stay `wrap="none"` with no autofit, and the box is wider than the PDF advance so the last glyph is not cut.
+
+Canva paints each caption letter twice on the same spot. The second copy was starting a new box, so "Realistic" was drawn as "Re"+"ea"+… and the R disappeared. The duplicate is dropped and the letters join.
+
 ## 1.3.8
 
 PDFMaker names a one-channel gray color space and then emits a single number. That number was stored as the blue channel, so bjedu-2026 and nbs-alibaba came out `#0000FF`. DeviceGray, CalGray, and an ICC profile with N=1 now consume one number and paint `(g,g,g)`.

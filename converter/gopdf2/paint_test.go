@@ -278,20 +278,24 @@ func TestMITSlidePaint(t *testing.T) {
 	}
 }
 
-func TestBakeWhiteLogoOntoBackground(t *testing.T) {
+func TestLightWordmarkStaysAPicture(t *testing.T) {
 	bg := image.NewNRGBA(image.Rect(0, 0, 20, 10))
 	for y := 0; y < 10; y++ {
 		for x := 0; x < 20; x++ {
 			bg.SetNRGBA(x, y, color.NRGBA{R: 0, G: 40, B: 140, A: 255})
 		}
 	}
-	logo := image.NewNRGBA(image.Rect(0, 0, 4, 4))
-	for y := 0; y < 4; y++ {
-		for x := 0; x < 4; x++ {
+	logo := image.NewNRGBA(image.Rect(0, 0, 8, 8))
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			logo.SetNRGBA(x, y, color.NRGBA{A: 0})
+		}
+	}
+	for y := 2; y < 6; y++ {
+		for x := 2; x < 6; x++ {
 			logo.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
 		}
 	}
-	logo.SetNRGBA(0, 0, color.NRGBA{A: 0})
 	var bgBuf, logoBuf bytes.Buffer
 	if err := png.Encode(&bgBuf, bg); err != nil {
 		t.Fatal(err)
@@ -301,20 +305,204 @@ func TestBakeWhiteLogoOntoBackground(t *testing.T) {
 	}
 	p := &Page{Elements: []PageElement{
 		{Image: &ImageObject{Data: bgBuf.Bytes(), Format: "png", X: 0, Y: 0, Width: 20, Height: 10}},
-		{Image: &ImageObject{Data: logoBuf.Bytes(), Format: "png", X: 4, Y: 2, Width: 4, Height: 4}},
+		{Image: &ImageObject{Data: logoBuf.Bytes(), Format: "png", X: 4, Y: 2, Width: 8, Height: 8}},
 	}}
-	bakeAlphaOverlays(p)
-	if len(p.Elements) != 1 {
-		t.Fatalf("overlay still separate: %d elements", len(p.Elements))
+	opacifyLightMasks(p)
+	if len(p.Elements) != 2 {
+		t.Fatalf("wordmark picture was dropped: %d elements", len(p.Elements))
 	}
-	img, err := png.Decode(bytes.NewReader(p.Elements[0].Image.Data))
+	img, err := png.Decode(bytes.NewReader(p.Elements[1].Image.Data))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Logo covers x 4..8 of 20 px, so pixel x=5 should be white.
-	r, g, b, _ := img.At(5, 3).RGBA()
-	if r>>8 < 240 || g>>8 < 240 || b>>8 < 240 {
-		t.Fatalf("baked pixel %d,%d,%d", r>>8, g>>8, b>>8)
+	// Letter core is white and opaque. A clear pixel shows the blue behind it.
+	lr, lg, lb, la := img.At(3, 3).RGBA()
+	if la>>8 != 255 || lr>>8 < 240 || lg>>8 < 240 || lb>>8 < 240 {
+		t.Fatalf("letter pixel %d,%d,%d a=%d", lr>>8, lg>>8, lb>>8, la>>8)
+	}
+	cr, cg, cb, ca := img.At(0, 0).RGBA()
+	if ca>>8 != 255 || cb>>8 < 100 || cr>>8 > 40 {
+		t.Fatalf("clear pixel should be the blue backdrop, got %d,%d,%d a=%d", cr>>8, cg>>8, cb>>8, ca>>8)
+	}
+}
+
+func TestTwoImagesAreBothKept(t *testing.T) {
+	img := bytes.Repeat([]byte{10, 20, 200}, 16)
+	stream := "<<" + "/Type /XObject /Subtype /Image /Width 4 /Height 4 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length 48 >>\nstream\n" + string(img) + "\nendstream"
+	content := "q\n40 0 0 30 0 0 cm\n/Im0 Do\nQ\nq\n8 0 0 8 4 4 cm\n/Im1 Do\nQ\n"
+	p := openPDF(t, pdfBytes([]string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 40 30] /Resources << /XObject << /Im0 5 0 R /Im1 6 0 R >> >> /Contents 4 0 R >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
+		stream,
+		stream,
+	}))
+	n := 0
+	for _, el := range p.Elements {
+		if el.Image != nil {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("pictures = %d, want 2", n)
+	}
+}
+
+func TestImageClipCropsAndDrops(t *testing.T) {
+	img := bytes.Repeat([]byte{200, 10, 10}, 400)
+	stream := "<< /Type /XObject /Subtype /Image /Width 20 /Height 20 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length 1200 >>\nstream\n" + string(img) + "\nendstream"
+	content := "10 12 8 6 re W n\nq\n40 0 0 30 0 0 cm\n/Im0 Do\nQ\n"
+	p := openPDF(t, pdfBytes([]string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 40 30] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
+		stream,
+	}))
+	var got *ImageObject
+	for _, el := range p.Elements {
+		if el.Image != nil {
+			got = el.Image
+		}
+	}
+	if got == nil {
+		t.Fatal("clipped image was dropped")
+	}
+	if math.Abs(got.X-10) > 1 || math.Abs(got.Width-8) > 1 || math.Abs(got.Height-6) > 1 {
+		t.Fatalf("crop box %.1f,%.1f %.1fx%.1f", got.X, got.Y, got.Width, got.Height)
+	}
+	outside := "0 0 5 5 re W n\nq\n10 0 0 10 30 0 cm\n/Im0 Do\nQ\n"
+	p2 := openPDF(t, pdfBytes([]string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 40 30] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(outside), outside),
+		stream,
+	}))
+	for _, el := range p2.Elements {
+		if el.Image != nil {
+			t.Fatalf("image outside the clip was kept at %.1f,%.1f", el.Image.X, el.Image.Y)
+		}
+	}
+}
+
+func TestStitchRealisticGeometry(t *testing.T) {
+	parts := []struct {
+		s        string
+		x, w, sz float64
+	}{
+		{"R", 622.9, 26.8, 41.2},
+		{"Re", 622.9, 55.0, 42.9},
+		{"ea", 652.5, 52.8, 42.9},
+		{"al", 680.6, 50.6, 44.8},
+		{"li", 708.0, 37.4, 44.8},
+		{"is", 722.3, 36.2, 44.8},
+		{"st", 737.1, 47.4, 44.8},
+		{"ti", 761.2, 42.7, 44.8},
+		{"ic", 780.7, 37.7, 44.8},
+		{"c", 795.5, 22.9, 44.8},
+	}
+	p := &Page{}
+	for _, part := range parts {
+		p.Elements = append(p.Elements, PageElement{Text: &TextObject{
+			Content: part.s, X: part.x, Y: 643.07 - part.sz, Width: part.w, Height: 50,
+			FontSize: part.sz, FontName: "Noto Sans",
+		}})
+	}
+	mergeTextLines(p)
+	if len(p.Elements) != 1 || p.Elements[0].Text == nil || p.Elements[0].Text.Content != "Realistic" {
+		var got string
+		for _, el := range p.Elements {
+			if el.Text != nil {
+				got += fmt.Sprintf("%q ", el.Text.Content)
+			}
+		}
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestDropDuplicateLetters(t *testing.T) {
+	// Each letter is painted twice at the same place. The copy must be
+	// discarded so the word stays "Realistic" rather than "Re"+"ea"+...
+	letters := []struct {
+		s    string
+		x, w float64
+	}{
+		{"R", 0, 12}, {"R", 0, 12},
+		{"e", 10, 12}, {"e", 10, 12},
+		{"a", 20, 12}, {"a", 20, 12},
+		{"l", 30, 12}, {"l", 30, 12},
+		{"i", 40, 10}, {"i", 40, 10},
+		{"s", 48, 12}, {"s", 48, 12},
+		{"t", 58, 12}, {"t", 58, 12},
+		{"i", 68, 10}, {"i", 68, 10},
+		{"c", 76, 12}, {"c", 76, 12},
+	}
+	p := &Page{}
+	for _, part := range letters {
+		p.Elements = append(p.Elements, PageElement{Text: &TextObject{
+			Content: part.s, X: part.x, Y: 100, Width: part.w, Height: 20,
+			FontSize: 18, FontName: "Noto Sans",
+		}})
+	}
+	mergeTextLines(p)
+	var text string
+	for _, el := range p.Elements {
+		if el.Text != nil {
+			text += el.Text.Content + "|"
+		}
+	}
+	if text != "Realistic|" {
+		t.Fatalf("got %s", text)
+	}
+}
+
+func TestStitchOverlappingBigrams(t *testing.T) {
+	// Canva draws "Realistic" as overlapping pairs. Each pair shares a letter
+	// with the next and covers more than half of the shorter box.
+	parts := []struct {
+		s    string
+		x, w float64
+	}{
+		{"R", 0, 12},
+		{"Re", 0, 22},
+		{"ea", 10, 22},
+		{"al", 20, 22},
+		{"li", 30, 22},
+		{"is", 40, 22},
+		{"st", 50, 22},
+		{"ti", 60, 22},
+		{"ic", 70, 22},
+		{"c", 80, 14},
+	}
+	p := &Page{}
+	for _, part := range parts {
+		p.Elements = append(p.Elements, PageElement{Text: &TextObject{
+			Content: part.s, X: part.x, Y: 100, Width: part.w, Height: 20,
+			FontSize: 18, FontName: "Noto Sans",
+		}})
+	}
+	// A real word gap must still become a space.
+	p.Elements = append(p.Elements,
+		PageElement{Text: &TextObject{Content: "Getty", X: 200, Y: 100, Width: 40, Height: 20, FontSize: 18, FontName: "Noto Sans"}},
+		PageElement{Text: &TextObject{Content: "images", X: 248, Y: 100, Width: 50, Height: 20, FontSize: 18, FontName: "Noto Sans"}},
+	)
+	mergeTextLines(p)
+	var text string
+	for _, el := range p.Elements {
+		if el.Text != nil {
+			text += el.Text.Content + "\n"
+		}
+	}
+	if !strings.Contains(text, "Realistic") {
+		t.Fatalf("bigrams were not stitched:\n%s", text)
+	}
+	if strings.Contains(text, "Reea") || strings.Contains(text, "ealistic") && !strings.Contains(text, "Realistic") {
+		t.Fatalf("stitch left a broken word:\n%s", text)
+	}
+	if !strings.Contains(text, "Getty images") {
+		t.Fatalf("word space dropped:\n%s", text)
 	}
 }
 

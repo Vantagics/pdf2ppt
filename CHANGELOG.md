@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.8
+
+PowerPoint draws each text box from its own x. On KUST page 4 the opening "(" was its own box at 483.9 pt, sitting inside the run that still contained z₁, so the parenthesis was painted on top of z₁. Shrinking the glyph did not move that box. The run is split at the gap the parenthesis occupies, and that parenthesis is not merged back. The boxes are now `p₂ = p₁ + ρg` ending at 483.0 pt, `(` from 483.9 to 495.0 pt, and `z₁ − z₂ )` starting at 495.0 pt. They do not overlap. `TestKUSTOpeningParenMatchesZ` checks that geometry.
+
+Equation letters are subscripts again when they are 22 pt or smaller (B_s, x, n_h). Canva title letters are 33 pt and up, so pages 2, 7, and 8 stay `What is Canva?`, `Creating Designs`, and `Canva for Social`. Slides whose text changed from v1.4.7: beamer-flip 19, 20, 22, 23; uai2025-keynote 22–27, 33, 66; neurips-effxfmr 41–45; kust-pressure 4. `TestTextRecallBaseline` fails when unique-token recall drops more than 0.3 percentage points from the stored value. `tsmc-2q25-zh` is still behind Cloudflare, so that deck was not remeasured; the letter-subscript rule is the same one that put beamer-flip and uai2025-keynote back on the v1.4.6 text.
+
 ## 1.4.7
 
 The KUST opening parenthesis was 32 pt because PowerPoint's character spacing (`Tc` ≈ 30) was counted as the glyph's width. `fitRun` then grew "(" to fill an 81 pt box, and that box covered `z₁`. The spacing after the last glyph is no longer ink, so "(" stays the same size as `z` on page 4. The formula is still `p₂ = p₁ + ρg(z₁ − z₂)`.

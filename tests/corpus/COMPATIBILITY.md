@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.4.8
+
+KUST page 4 draws `(` in its own box, ending where `z₁` starts, so the parenthesis is not painted on `z₁`. Equation letters at 22 pt or below are subscripts again. Canva Rotary titles are unchanged from v1.4.7. `TestTextRecallBaseline` fails if unique-token recall drops more than 0.3 percentage points. `tsmc-2q25-zh` was not remeasured.
+
 ## v1.4.7
 
 The KUST "(" on page 4 is the same size as `z`. Canva Rotary titles on pages 2, 7, and 8 keep reading order; a smaller letter is not a subscript. canva-mahidol still has `AI` as its own runs. The v1.4.2 token `aaii` was the doubled form of that `AI`.

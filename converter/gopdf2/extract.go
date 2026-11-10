@@ -73,6 +73,9 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	if inh != nil && inh.Rotate != 0 {
 		applyRotation(page, inh.Rotate)
 	}
+	// Before merge, while "(" is still its own glyph. The split marks that
+	// glyph so merge does not pull it back into the run it was covering.
+	uncoverOverlaidGlyphs(page)
 	mergeTextLines(page)
 	attachSubscripts(page)
 	pullBackOverlaps(page)

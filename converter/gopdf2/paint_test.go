@@ -191,8 +191,8 @@ func TestSubscriptJoinsBelowALetter(t *testing.T) {
 }
 
 func TestLetterUnderAWordIsNotASubscript(t *testing.T) {
-	// Canva sets a smaller letter just under a big one. That letter is part
-	// of the word, not a formula subscript.
+	// Canva sets a smaller title letter just under a display cap. That letter
+	// is part of the word, not a formula subscript.
 	big := &TextObject{Content: "W", FontName: "Noto Sans", FontSize: 134, X: 334, Y: 32, Width: 90, Height: 160}
 	small := &TextObject{Content: "a", FontName: "Noto Sans", FontSize: 36, X: 430, Y: 90, Width: 28, Height: 40}
 	p := &Page{Elements: []PageElement{{Text: big}, {Text: small}}}
@@ -202,6 +202,17 @@ func TestLetterUnderAWordIsNotASubscript(t *testing.T) {
 	}
 	if big.Content != "W" || small.Content != "a" {
 		t.Fatalf("content %q %q", big.Content, small.Content)
+	}
+}
+
+func TestEquationLetterSubscriptStays(t *testing.T) {
+	// B_s on the beamer table. The s is a few points tall, unlike a Canva title letter.
+	body := &TextObject{Content: "10B", FontName: "Tinos", FontSize: 11.2, X: 27.8, Y: 100, Width: 28, Height: 13}
+	sub := &TextObject{Content: "s", FontName: "Tinos", FontSize: 7.8, X: 50, Y: 108, Width: 6, Height: 9}
+	p := &Page{Elements: []PageElement{{Text: body}, {Text: sub}}}
+	attachSubscripts(p)
+	if len(p.Elements) != 1 || !strings.Contains(body.Content, "s") {
+		t.Fatalf("equation subscript dropped: %d elements, content %q", len(p.Elements), body.Content)
 	}
 }
 
@@ -221,23 +232,52 @@ func TestKUSTOpeningParenMatchesZ(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var paren *TextObject
+	// PowerPoint draws each box from its own x, with no autofit. The opening
+	// "(" has to end at or before z₁ starts. Sharing one box is fine only
+	// when "(" comes first; a second box that still contains z must not
+	// overlap that box either.
+	var paren, zbox *TextObject
 	for _, tb := range p.TextObjects {
-		if strings.Contains(tb.Content, "(") && strings.Contains(tb.Content, "z") && tb.FontSize > 20 {
+		if tb.FontSize < 20 {
+			continue
+		}
+		if strings.TrimSpace(tb.Content) == "(" && (paren == nil || tb.X > 400) {
 			paren = tb
-			break
+		}
+		if strings.Contains(tb.Content, "z") && strings.Contains(tb.Content, "(") && zbox == nil {
+			zbox = tb
+			paren = tb
 		}
 	}
 	if paren == nil {
 		t.Fatal("formula parenthesis was not found")
 	}
-	// Tc used to make this box 32 pt. The z beside it is about 30 pt.
-	if paren.FontSize > 31 {
-		t.Fatalf("opening paren box is %.1f pt; character spacing grew the glyph", paren.FontSize)
+	if zbox == nil {
+		for _, tb := range p.TextObjects {
+			if tb.FontSize < 20 || !strings.Contains(tb.Content, "z") || tb.X < paren.X-1 {
+				continue
+			}
+			if zbox == nil || tb.X < zbox.X {
+				zbox = tb
+			}
+		}
 	}
-	for _, r := range paren.Runs {
-		if strings.HasPrefix(strings.TrimSpace(r.Content), "(") && r.FontSize > 31 {
-			t.Fatalf("opening paren run is %.1f pt", r.FontSize)
+	if zbox == nil {
+		t.Fatal("formula z was not found")
+	}
+	if zbox == paren {
+		if strings.Index(paren.Content, "(") > strings.Index(paren.Content, "z") {
+			t.Fatalf("z₁ is before the parenthesis: %q", paren.Content)
+		}
+	} else if paren.X+paren.Width > zbox.X+0.8 {
+		t.Fatalf("paren box [%.1f, %.1f] overlaps z box [%.1f, %.1f] %q", paren.X, paren.X+paren.Width, zbox.X, zbox.X+zbox.Width, zbox.Content)
+	}
+	for _, tb := range p.TextObjects {
+		if tb == paren || tb.FontSize < 20 || !strings.Contains(tb.Content, "z") {
+			continue
+		}
+		if tb.X < paren.X+paren.Width-0.8 && paren.X < tb.X+tb.Width-0.8 {
+			t.Fatalf("z box [%.1f, %.1f] %q overlaps the ( box [%.1f, %.1f]", tb.X, tb.X+tb.Width, tb.Content, paren.X, paren.X+paren.Width)
 		}
 	}
 }

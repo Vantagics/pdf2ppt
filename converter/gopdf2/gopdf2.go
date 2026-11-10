@@ -76,6 +76,10 @@ type TextObject struct {
 	// Runs is set when several PDF runs on one line were merged into this
 	// box. Content is the concatenation. Empty means a single run.
 	Runs []TextRun
+	// holdX keeps this glyph from being merged into the run beside it.
+	// PowerPoint lays a merged run out from the box origin, which put the
+	// KUST "(" on top of z₁.
+	holdX bool
 }
 
 // TextRun is one style span inside a merged line.

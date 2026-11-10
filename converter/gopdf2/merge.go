@@ -138,6 +138,11 @@ func duplicateOverlap(prev, t *TextObject) bool {
 
 func contiguous(g []textRef, t *TextObject) bool {
 	prev := g[len(g)-1].t
+	// An uncovered parenthesis keeps the x it was drawn at. Merging it
+	// back into the run on either side paints it on top of z₁.
+	if prev.holdX || t.holdX {
+		return false
+	}
 	gap := t.X - (prev.X + prev.Width)
 	em := math.Max(prev.FontSize, t.FontSize)
 	if em < 1 {
@@ -397,19 +402,254 @@ func attachSubscripts(p *Page) {
 }
 
 func subscriptCandidate(t *TextObject) bool {
-	// Only a digit. Canva paints a smaller letter just below a big one
-	// (the title "What", "Social"); treating that letter as a subscript
-	// pulled it out of reading order. A formula digit is the real case.
+	// A digit, or a short equation letter (B_s, x'). Canva paints a smaller
+	// title letter (30 pt and up) just under a display cap; attaching that
+	// letter pulled "What" and "Social" out of order.
 	s := strings.TrimSpace(t.Content)
 	if s == "" || utf8.RuneCountInString(s) > 2 {
 		return false
 	}
 	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
+		if r >= '0' && r <= '9' {
+			continue
 		}
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+			if t.FontSize > 22 {
+				return false
+			}
+			continue
+		}
+		return false
 	}
 	return true
+}
+
+// uncoverOverlaidGlyphs splits a run when another glyph is drawn in the
+// middle of it. PowerPoint lays each box out from its own x, so the KUST
+// "(" at 484 pt was painted on top of z₁, which still lived in "g z".
+func uncoverOverlaidGlyphs(p *Page) {
+	for iter := 0; iter < 8; iter++ {
+		var texts []*TextObject
+		for i := range p.Elements {
+			t := p.Elements[i].Text
+			if t != nil && horizontal(t.Rotation) && t.Content != "" {
+				texts = append(texts, t)
+			}
+		}
+		split := false
+		for _, a := range texts {
+			if utf8.RuneCountInString(a.Content) < 2 {
+				continue
+			}
+			var intruder *TextObject
+			for _, b := range texts {
+				if b == a || subscriptCandidate(b) || !fenceGlyph(b.Content) {
+					continue
+				}
+				if !sameLine(a, b) {
+					continue
+				}
+				// The fence's origin sits in the body of this run, not on a
+				// shared edge. A letter here used to cut the word in half.
+				if b.X <= a.X+0.8 || b.X >= a.X+a.Width-1.5 {
+					continue
+				}
+				if intruder == nil || b.X < intruder.X {
+					intruder = b
+				}
+			}
+			if intruder != nil && splitRunAround(p, a, intruder) {
+				split = true
+				break
+			}
+		}
+		if !split {
+			return
+		}
+	}
+}
+
+func splitRunAround(p *Page, a, b *TextObject) bool {
+	rs := []rune(a.Content)
+	shares := runeShares(rs, a.Width)
+	var cum float64
+	cut := -1
+	dropSpace := false
+	for i, r := range rs {
+		start := a.X + cum
+		end := start + shares[i]
+		// Only a gap. Cutting a letter split "disease" and "Metrics".
+		if unicode.IsSpace(r) && b.X >= start-0.3 && b.X < end-0.3 {
+			cut = i
+			dropSpace = true
+			break
+		}
+		cum += shares[i]
+	}
+	if cut <= 0 {
+		return false
+	}
+	rightRunes := rs[cut:]
+	if dropSpace {
+		rightRunes = rs[cut+1:]
+	}
+	leftRunes := rs[:cut]
+	rightStr := strings.TrimLeft(string(rightRunes), " ")
+	if len(leftRunes) == 0 || rightStr == "" {
+		return false
+	}
+	leftW := 0.0
+	for i := 0; i < cut; i++ {
+		leftW += shares[i]
+	}
+	origRight := a.X + a.Width
+	rightX := b.X + b.Width
+	natural := a.X + leftW
+	if dropSpace {
+		natural += shares[cut]
+	}
+	if natural > rightX {
+		rightX = natural
+	}
+	if rightX > origRight-0.4 {
+		return false
+	}
+	leftRuns, rightRuns := splitRunSlice(a.Runs, cut, dropSpace)
+	rightRuns = trimLeftRunSpaces(rightRuns)
+	leftContent := string(leftRunes)
+	if len(leftRuns) > 0 {
+		leftContent = joinRunContent(leftRuns)
+	}
+	rightContent := rightStr
+	if len(rightRuns) > 0 {
+		rightContent = joinRunContent(rightRuns)
+	}
+	if leftContent == "" || rightContent == "" {
+		return false
+	}
+	right := *a
+	a.Content = leftContent
+	a.Width = math.Min(leftW, b.X-a.X)
+	if a.Width < 0.4 {
+		a.Width = 0.4
+	}
+	a.Runs = leftRuns
+	right.Content = rightContent
+	right.X = rightX
+	right.Width = origRight - rightX
+	if right.Width < 0.4 {
+		right.Width = 0.4
+	}
+	right.Runs = rightRuns
+	b.holdX = true
+	p.Elements = append(p.Elements, PageElement{Text: &right})
+	return true
+}
+
+func joinRunContent(runs []TextRun) string {
+	var b strings.Builder
+	for _, r := range runs {
+		b.WriteString(r.Content)
+	}
+	return b.String()
+}
+
+func trimLeftRunSpaces(runs []TextRun) []TextRun {
+	for len(runs) > 0 {
+		rs := []rune(runs[0].Content)
+		i := 0
+		for i < len(rs) && unicode.IsSpace(rs[i]) {
+			i++
+		}
+		if i == 0 {
+			break
+		}
+		if i >= len(rs) {
+			runs = runs[1:]
+			continue
+		}
+		runs[0].Content = string(rs[i:])
+		break
+	}
+	return runs
+}
+
+// splitRunSlice breaks runs at a rune index. dropSpace discards the rune
+// at cut, which is the gap the overlaid parenthesis occupied.
+func splitRunSlice(runs []TextRun, cut int, dropSpace bool) (left, right []TextRun) {
+	if len(runs) == 0 {
+		return nil, nil
+	}
+	skip := cut
+	if dropSpace {
+		skip = cut + 1
+	}
+	seen := 0
+	for _, r := range runs {
+		rs := []rune(r.Content)
+		n := len(rs)
+		end := seen + n
+		switch {
+		case end <= cut:
+			left = append(left, r)
+		case seen >= skip:
+			right = append(right, r)
+		default:
+			if cut > seen {
+				lr := r
+				lr.Content = string(rs[:cut-seen])
+				left = append(left, lr)
+			}
+			from := skip - seen
+			if from < n {
+				rr := r
+				rr.Content = string(rs[from:])
+				right = append(right, rr)
+			}
+		}
+		seen = end
+	}
+	return left, right
+}
+
+func runeShares(rs []rune, total float64) []float64 {
+	w := make([]float64, len(rs))
+	var sum float64
+	for i, r := range rs {
+		if unicode.IsSpace(r) {
+			w[i] = 0.33
+		} else {
+			w[i] = 0.55
+		}
+		sum += w[i]
+	}
+	if sum == 0 || total <= 0 {
+		each := 1.0
+		if len(rs) > 0 {
+			each = total / float64(len(rs))
+		}
+		for i := range w {
+			w[i] = each
+		}
+		return w
+	}
+	for i := range w {
+		w[i] = w[i] / sum * total
+	}
+	return w
+}
+
+func fenceGlyph(s string) bool {
+	s = strings.TrimSpace(s)
+	if utf8.RuneCountInString(s) != 1 {
+		return false
+	}
+	switch []rune(s)[0] {
+	case '(', ')', '[', ']', '{', '}':
+		return true
+	default:
+		return false
+	}
 }
 
 func subscriptHost(body, sub *TextObject) bool {

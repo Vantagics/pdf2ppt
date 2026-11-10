@@ -1,4 +1,22 @@
-# Compatibility notes (v1.2.1)
+# Compatibility notes
+
+## v1.3.6, checked in Microsoft PowerPoint
+
+Fifteen more decks are listed in `manifest.json` (Google Slides, Canva, WPS, Keynote, LibreOffice, PDFMaker, and several PowerPoint years). They are not committed. A 25-deck pass opened every PPTX in PowerPoint 16 with no repair dialog and the dominant page size.
+
+What that pass showed, and what changed:
+
+- Google Slides (saasopen) covered the page and the cards with opaque black. Those rectangles are fill opacity 0. They are not written.
+- Tencent PDFMaker dropped letters inside even-length runs (`CORPORATE OVERVIEW` → `CORP`). The ToUnicode map is one byte wide; decoding follows that.
+- WPS page 2 lost its white panel because a full-page frame with a hole was stored as a solid background. A path with more than one subpath stays a shape.
+- Rotated pictures keep the image transform's angle.
+- A space is not inserted after CJK punctuation. Wingdings `➢` is drawn with Segoe UI Symbol. Symbol private-use math maps to Unicode.
+
+Still open after this pass: a Keynote Type 1C icon with no ToUnicode is still the MacRoman character (`$` for the lock on psumac page 30). Drawing that glyph needs the CFF outline. Canva's script "Canva" wordmark is not a text run in the PDF (it is outlined or a Type 3 font) and is not reconstructed as letters. Some formula subscripts and a few missing numerals in dense PDFMaker body text can still sit in the wrong box.
+
+`TestTextRecall` fails when pdftotext words are missing from the PPTX. It runs when the corpus PDFs are on disk.
+
+## v1.2.1
 
 v1.3.0 makes the Beamer line "THIS IS A" bold again (the dropped contour was the weight; it is also a text outline) and stops condensing "Gotham University". Spacing is only a few percent of an em; a wider fallback is scaled instead. Gill Sans is drawn with Liberation Sans, which has a real italic. Side-by-side: the title page in the 1.3.0 artifacts.
 

@@ -307,10 +307,13 @@ func formatShape(sh *Shape, id int) string {
 	}
 	if sh.Gradient != nil {
 		sb.WriteString(formatGradFill(sh.Gradient))
-	} else if sh.HasFill {
+	} else if sh.HasFill && sh.FillAlpha > 0.001 {
 		sb.WriteString(`<a:solidFill><a:srgbClr val="` + fmt.Sprintf("%02X%02X%02X", sh.FillR, sh.FillG, sh.FillB) + `"`)
-		if sh.FillAlpha > 0 && sh.FillAlpha < 0.999 {
+		if sh.FillAlpha < 0.999 {
 			alpha := int(math.Round(sh.FillAlpha * 100000))
+			if alpha < 0 {
+				alpha = 0
+			}
 			sb.WriteString(fmt.Sprintf(`><a:alpha val="%d"/></a:srgbClr></a:solidFill>`, alpha))
 		} else {
 			sb.WriteString(`/></a:solidFill>`)

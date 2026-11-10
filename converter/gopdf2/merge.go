@@ -244,7 +244,7 @@ func coalesce(ts []*TextObject) []TextRun {
 			if em < 1 {
 				em = t.FontSize
 			}
-			if gap > em*0.12 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") {
+			if gap > em*0.22 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
 				push(TextRun{
 					Content: " ", FontName: prev.FontName, FontSize: prev.FontSize,
 					Bold: prev.Bold, Italic: prev.Italic,
@@ -262,6 +262,18 @@ func coalesce(ts []*TextObject) []TextRun {
 		runs = []TextRun{{Content: ""}}
 	}
 	return runs
+}
+
+func cjkBoundary(left, right string) bool {
+	return endsWithCJK(left) || startsWithCJK(right)
+}
+
+func startsWithCJK(s string) bool {
+	if s == "" {
+		return false
+	}
+	r, _ := utf8.DecodeRuneInString(s)
+	return r >= 0x2E80 && r <= 0x9FFF || r >= 0x3000 && r <= 0x303F || r >= 0xFF00 && r <= 0xFFEF
 }
 
 func sameStyle(a, b TextRun) bool {

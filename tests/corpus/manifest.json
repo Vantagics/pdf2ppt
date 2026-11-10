@@ -92,6 +92,141 @@
       "commit": false
     },
     {
+      "id": "cesar2025-ai",
+      "producer": "LibreOffice Impress 25.2",
+      "kind": "conference keynote on offensive ML",
+      "url": "https://2025.cesar-conference.org/program-media/CESAR-2025_keynote-OffensiveML_slide-deck.pdf",
+      "pages": 41,
+      "license": "Conference slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "libo-cjk",
+      "producer": "LibreOffice 7.0 Impress",
+      "kind": "LibreOffice conference talk on CJK typography",
+      "url": "https://sk.libreoffice.org/assets/libocon2020/Slides/enoki-cjk.pdf",
+      "pages": 32,
+      "license": "Conference slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "saasopen-google",
+      "producer": "Google Slides",
+      "kind": "SaaSOpen Austin 2024 keynote",
+      "url": "https://railsware.com/downloads/Yaroslav%20Lazor%20SaaSOpen%20Austin%20Keynote%202024.pdf",
+      "pages": 17,
+      "license": "Speaker slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "uai2025-keynote",
+      "producer": "Keynote (macOS Quartz PDFContext)",
+      "kind": "UAI 2025 academic keynote",
+      "url": "https://www.auai.org/uai2025/slides/Keynote%20Bareinboim.pdf",
+      "pages": 69,
+      "license": "Conference slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "canva-rotary",
+      "producer": "Canva",
+      "kind": "Rotary workshop deck",
+      "url": "https://www.rotaryzones3334.org/wp-content/uploads/2025/02/2024-10-21-Elevate-Your-Design-CANVA-2024.pdf",
+      "pages": 25,
+      "license": "Club workshop slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "ecss24-harman",
+      "producer": "Microsoft PowerPoint 2019",
+      "kind": "Informatics Europe ECSS 2024 research keynote",
+      "url": "https://www.informatics-europe.org/images/ECSS/ECSS2024/slides/ECSS24_Harman.pdf",
+      "pages": 47,
+      "license": "Conference slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "who-tb-2024",
+      "producer": "Microsoft PowerPoint for Microsoft 365",
+      "kind": "WHO Global Tuberculosis Report 2024 slide set",
+      "url": "https://cdn.who.int/media/docs/default-source/global-tuberculosis-report-2024/globaltbreport2024_slideset.pdf?sfvrsn=ccfdf95f_3",
+      "pages": 61,
+      "license": "WHO publication. Not committed; fetched by the script.",
+      "commit": false
+    },
+    {
+      "id": "mit-datamgmt",
+      "producer": "Microsoft PowerPoint 2010",
+      "kind": "MIT data-management workshop",
+      "url": "https://ocw.mit.edu/courses/res-str-002-data-management-spring-2016/9d8d702e3f5817c83bb0ac3de05556a9_MITRES_STR002S16_IntroDM.pdf",
+      "pages": 53,
+      "license": "MIT OpenCourseWare. Not committed; fetched by the script.",
+      "commit": false
+    },
+    {
+      "id": "wps-tutorial",
+      "producer": "WPS Presentation",
+      "kind": "short Chinese WPS tutorial",
+      "url": "https://res1.wpsacdm.cache.wpscdn.cn/files/8a12687190050a7172706b5eb39946a2.pdf",
+      "pages": 5,
+      "license": "WPS sample. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "tsmc-2q25-zh",
+      "producer": "Microsoft PowerPoint for Microsoft 365 (zh-TW)",
+      "kind": "TSMC 2Q25 Traditional Chinese earnings deck",
+      "url": "https://investor.tsmc.com/chinese/encrypt/files/encrypt_file/qr/phase4_reports/2025-07/9483d527d1ddeba9f895fade353628cf2938fb8d/2Q25%20Presentation%20%28C%29%20WoG.pdf",
+      "pages": 10,
+      "license": "Company earnings slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "bjedu-kyc",
+      "producer": "Microsoft PowerPoint 2016",
+      "kind": "Beijing education statistics training (Chinese UI screenshots)",
+      "url": "https://jw.beijing.gov.cn/kyc/zlxz_15523/202412/P020241225386847236034.pdf",
+      "pages": 48,
+      "license": "Government training material. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "mine-safety",
+      "producer": "Microsoft PowerPoint 2019",
+      "kind": "Chinese mine-safety technical briefing",
+      "url": "https://www.chinamine-safety.gov.cn/fw/ksaqkj/zjjz/202408/W020240823331772088032.pdf",
+      "pages": 63,
+      "license": "Government briefing. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "nhsa-ypsw",
+      "producer": "Acrobat PDFMaker 21 for PowerPoint",
+      "kind": "NHSA drug-reimbursement deck (Chinese)",
+      "url": "https://www.nhsa.gov.cn/attach/Ypsn2024/YPSW202400064/YPSW202400064(ppt).pdf",
+      "pages": 11,
+      "license": "Agency slides. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "tencent-4q24",
+      "producer": "Acrobat PDFMaker 19 for PowerPoint",
+      "kind": "Tencent 4Q24 corporate overview",
+      "url": "https://static.www.tencent.com/uploads/2025/05/14/ae7b09adea59dfa92095e1f7e3c2fb87.pdf",
+      "pages": 23,
+      "license": "Company earnings slides. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "kust-pressure",
+      "producer": "Microsoft Office PowerPoint 2007",
+      "kind": "Chinese chemical-engineering lab lecture with Symbol-font formulas",
+      "url": "https://hg.kust.edu.cn/__local/6/A1/5A/DA68D66AE712DAA41D3AF400F47_DF526FF3_4620D.pdf?e=.pdf",
+      "pages": 7,
+      "license": "University lecture. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
       "id": "chrome-skia",
       "producer": "Skia/PDF (Headless Chrome). Same PDF backend Google Slides uses; this file is printed from tests/corpus/slides.html, not downloaded from Google Slides.",
       "kind": "generated slide-like pages: gradient, rounded card, rotated text, Chinese",

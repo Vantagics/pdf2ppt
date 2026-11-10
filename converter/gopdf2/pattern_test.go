@@ -10,9 +10,16 @@ import (
 	"testing"
 )
 
+func TestChevronUsesAFontPowerPointHas(t *testing.T) {
+	s, fam, ok := rewriteWingdings("Wingdings-Regular", "➢")
+	if !ok || s != "➢" || fam != "Segoe UI Symbol" {
+		t.Fatalf("chevron %q %q %v", s, fam, ok)
+	}
+}
+
 func TestRewriteWingdingsArrow(t *testing.T) {
 	s, fam, ok := rewriteWingdings("Wingdings", "\uf0e0")
-	if !ok || s != "→" || fam != "DejaVu Sans" {
+	if !ok || s != "→" || fam != "Segoe UI Symbol" {
 		t.Fatalf("got %q %q %v", s, fam, ok)
 	}
 	if _, _, ok := rewriteWingdings("黑体", "\uf0e0"); ok {

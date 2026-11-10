@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
@@ -688,6 +689,17 @@ func (ip *interp) paint(fill, stroke, evenOdd bool) {
 	if !ok {
 		return
 	}
+	// ca/CA of 0 is how Google Slides hides the black rect under a clipped image.
+	// Painting it opaque covers the real background and the text.
+	if fill && ip.gs.fillAlpha <= 0.001 {
+		fill = false
+	}
+	if stroke && ip.gs.strokeAlpha <= 0.001 {
+		stroke = false
+	}
+	if !fill && !stroke {
+		return
+	}
 	if fill && ip.gs.fillTile != nil {
 		ip.emitTile(minX, minY, maxX, maxY)
 		fill = false
@@ -707,7 +719,9 @@ func (ip *interp) paint(fill, stroke, evenOdd bool) {
 		ip.bgGrad = ip.gs.fillGrad
 		return
 	}
-	if fill && ip.gs.fillGrad == nil && !ip.seenContent && ip.coversPage(minX, minY, maxX, maxY) && !hasCurve(ops) {
+	// A second subpath is a hole (a frame around a white panel). Painting the
+	// bounds as a solid page color fills that hole.
+	if fill && ip.gs.fillGrad == nil && !ip.seenContent && ip.coversPage(minX, minY, maxX, maxY) && !hasCurve(ops) && subpathCount(ops) <= 1 {
 		ip.hasBg = true
 		ip.bg = ip.gs.fill
 		return
@@ -786,6 +800,24 @@ func (ip *interp) coversPage(minX, minY, maxX, maxY float64) bool {
 		return false
 	}
 	return true
+}
+
+func subpathCount(ops []pathOp) int {
+	n := 0
+	for _, o := range ops {
+		if o.op == 'M' {
+			n++
+		}
+	}
+	return n
+}
+
+func endsWithCJK(s string) bool {
+	if s == "" {
+		return false
+	}
+	r, _ := utf8.DecodeLastRuneInString(s)
+	return r >= 0x2E80 && r <= 0x9FFF || r >= 0x3000 && r <= 0x303F || r >= 0xFF00 && r <= 0xFFEF
 }
 
 func hasCurve(ops []pathOp) bool {
@@ -920,7 +952,7 @@ func (ip *interp) showTJ(arr []token) {
 				total = 0
 				continue
 			}
-			if gapIsWordSpace(adj, fontSize) && !strings.HasSuffix(text, " ") {
+			if gapIsWordSpace(adj, fontSize) && !strings.HasSuffix(text, " ") && !endsWithCJK(text) {
 				text += " "
 			}
 			total += adj
@@ -997,6 +1029,10 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		}
 	}
 	if mapped, fam, ok := rewriteWingdings(family, text); ok {
+		text = mapped
+		family = fam
+	}
+	if mapped, fam, ok := rewriteSymbol(family, text); ok {
 		text = mapped
 		family = fam
 	}
@@ -1634,8 +1670,34 @@ func (ip *interp) paintImage(xo *xobject) {
 	maxX := math.Max(math.Max(c00x, c10x), math.Max(c01x, c11x))
 	minY := math.Min(math.Min(c00y, c10y), math.Min(c01y, c11y))
 	maxY := math.Max(math.Max(c00y, c10y), math.Max(c01y, c11y))
-	w := maxX - minX
-	h := maxY - minY
+	vx, vy := c10x-c00x, c10y-c00y
+	ux, uy := c01x-c00x, c01y-c00y
+	wAxis, hAxis := math.Hypot(vx, vy), math.Hypot(ux, uy)
+	rot := -math.Atan2(vy, vx) * 180 / math.Pi
+	for rot < 0 {
+		rot += 360
+	}
+	for rot >= 360 {
+		rot -= 360
+	}
+	// Axis-aligned CTMs, including the y-flip Google Slides uses, already
+	// match the bitmap when placed in the bounding box. A fanned photo does not.
+	diagonal := wAxis > 0.5 && math.Min(math.Abs(vx), math.Abs(vy)) > 0.2*wAxis
+	rotated := diagonal && hAxis > 0.5
+	var x, y, w, h float64
+	if rotated {
+		cx := (c00x + c10x + c01x + c11x) / 4
+		cy := (c00y + c10y + c01y + c11y) / 4
+		w, h = wAxis, hAxis
+		x = cx - w/2 - ip.originX
+		y = (ip.originY + ip.pageH) - cy - h/2
+	} else {
+		w = maxX - minX
+		h = maxY - minY
+		x = minX - ip.originX
+		y = (ip.originY + ip.pageH) - maxY
+		rot = 0
+	}
 	if w < 0.5 || h < 0.5 {
 		return
 	}
@@ -1655,12 +1717,13 @@ func (ip *interp) paintImage(xo *xobject) {
 		}
 	}
 	img := &ImageObject{
-		Data:   data,
-		Format: format,
-		X:      minX - ip.originX,
-		Y:      (ip.originY + ip.pageH) - maxY,
-		Width:  w,
-		Height: h,
+		Data:     data,
+		Format:   format,
+		X:        x,
+		Y:        y,
+		Width:    w,
+		Height:   h,
+		Rotation: rot,
 	}
 	ip.seenContent = true
 	ip.elements = append(ip.elements, PageElement{Image: img})

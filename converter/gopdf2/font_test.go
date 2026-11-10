@@ -61,6 +61,32 @@ func TestWinAnsiAccent(t *testing.T) {
 	}
 }
 
+func TestPDFMakerOneByteCMap(t *testing.T) {
+	f := &pdfFont{codeLen: 1, toUni: map[uint64]string{}, widths: map[int]float64{}, defWidth: 500}
+	parseCMap("begincodespacerange\n<0000> <FFFF>\nendcodespacerange\nbeginbfchar\n<74> <0074>\n<68> <0068>\n<4F> <004F>\n<52> <0052>\n<41> <0041>\n<54> <0054>\n<45> <0045>\n<20> <0020>\n<56> <0056>\n<49> <0049>\nendbfchar\n", f)
+	if f.codeLen != 1 {
+		t.Fatalf("codeLen %d", f.codeLen)
+	}
+	s, _ := f.decodeBytes([]byte("th"), 10, 0, 0, 100)
+	if s != "th" {
+		t.Fatalf("pair decoded %q", s)
+	}
+	s, _ = f.decodeBytes([]byte("ORATE OVERVI"), 10, 0, 0, 100)
+	if s != "ORATE OVERVI" {
+		t.Fatalf("even run decoded %q", s)
+	}
+	// A real Identity-H map uses four hex digits per code.
+	g := &pdfFont{codeLen: 2, toUni: map[uint64]string{}, widths: map[int]float64{}, defWidth: 500}
+	parseCMap("beginbfchar\n<0001> <0041>\nendbfchar\n", g)
+	if g.codeLen != 2 {
+		t.Fatalf("identity codeLen %d", g.codeLen)
+	}
+	s, _ = g.decodeBytes([]byte{0, 1}, 10, 0, 0, 100)
+	if s != "A" {
+		t.Fatalf("identity decoded %q", s)
+	}
+}
+
 func TestWordSpaceGap(t *testing.T) {
 	// xdvipdfmx TJ -250 is exactly 0.25 em and must count as a space.
 	if !gapIsWordSpace(tjAdjust(-250, 12, 100), 12) {

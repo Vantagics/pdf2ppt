@@ -2,10 +2,13 @@ package gopdf2
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -102,6 +105,93 @@ func TestMergeHyphenatedLine(t *testing.T) {
 	if !strings.Contains(joined, "alone") {
 		t.Fatalf("distant run was swallowed: %s", joined)
 	}
+}
+
+func TestZeroAlphaFillIsNotPainted(t *testing.T) {
+	// Google Slides draws a black rect with ca 0, then clips an image to it.
+	content := "q /A0 gs 0 0 0 rg 0 0 100 50 re f Q 1 0 0 rg 10 10 20 10 re f\n"
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 50] /Resources << /ExtGState << /A0 4 0 R >> >> /Contents 5 0 R >>",
+		"<< /Type /ExtGState /ca 0 /CA 0 >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
+	}
+	p := openPDF(t, pdfBytes(objs))
+	for _, el := range p.Elements {
+		if el.Shape != nil && el.Shape.FillR == 0 && el.Shape.FillG == 0 && el.Shape.FillB == 0 && el.Shape.HasFill {
+			t.Fatalf("transparent black rect was painted: %+v", el.Shape)
+		}
+	}
+	var red bool
+	for _, el := range p.Elements {
+		if el.Shape != nil && el.Shape.FillR == 255 && el.Shape.HasFill {
+			red = true
+		}
+	}
+	if !red {
+		t.Fatal("opaque red rect missing")
+	}
+}
+
+func TestFrameIsNotASolidBackground(t *testing.T) {
+	// Outer page rect plus an inner subpath. The hole must stay a shape,
+	// not a solid gray page.
+	content := "1 1 1 rg 0 0 200 100 re f 0.46 0.50 0.61 rg 0 0 m 200 0 l 200 100 l 0 100 l h 20 20 m 180 20 l 180 80 l 20 80 l h f\n"
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
+	}
+	p := openPDF(t, pdfBytes(objs))
+	if p.BgR < 250 || p.BgG < 250 || p.BgB < 250 {
+		t.Fatalf("background should stay the white rect, got %d,%d,%d", p.BgR, p.BgG, p.BgB)
+	}
+	var frame bool
+	for _, el := range p.Elements {
+		if el.Shape != nil && el.Shape.HasFill && len(el.Shape.Path) > 4 {
+			frame = true
+		}
+	}
+	if !frame {
+		t.Fatal("frame with a hole was dropped")
+	}
+}
+
+func openPDF(t *testing.T, b []byte) *Page {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "t.pdf")
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := doc.GetPage(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func pdfBytes(objs []string) []byte {
+	var buf bytes.Buffer
+	buf.WriteString("%PDF-1.4\n")
+	offs := make([]int, len(objs)+1)
+	for i, body := range objs {
+		offs[i+1] = buf.Len()
+		fmt.Fprintf(&buf, "%d 0 obj\n%s\nendobj\n", i+1, body)
+	}
+	xref := buf.Len()
+	fmt.Fprintf(&buf, "xref\n0 %d\n", len(objs)+1)
+	buf.WriteString("0000000000 65535 f \n")
+	for i := 1; i <= len(objs); i++ {
+		fmt.Fprintf(&buf, "%010d 00000 n \n", offs[i])
+	}
+	fmt.Fprintf(&buf, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, xref)
+	return buf.Bytes()
 }
 
 func TestMITSlidePaint(t *testing.T) {

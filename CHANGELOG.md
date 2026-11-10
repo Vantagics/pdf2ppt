@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.6
+
+PowerPoint on a 25-deck corpus stayed valid and the right size, and several slides were still wrong.
+
+Google Slides paints a black rectangle with fill opacity 0 under a clipped image. That rectangle was written as opaque black, so it covered the teal page and the card text. A fill or stroke with opacity 0 is no longer emitted.
+
+Acrobat PDFMaker attaches a two-byte codespace to a one-byte WinAnsi font. Even-length strings were decoded as one code per pair, so "CORPORATE OVERVIEW" became "CORP" and "Fourth Quarter of 2024" became "Four r of". The code width now follows the ToUnicode keys.
+
+A path that covers the page and has a second subpath is a frame with a hole. It was absorbed as a solid page color, which is why the WPS white panel disappeared. Only a single rectangle becomes the page background.
+
+A rotated image keeps the angle of its transform instead of being placed in the axis-aligned box. CJK punctuation no longer grows an ASCII space. Wingdings chevrons use Segoe UI Symbol, which PowerPoint has. Symbol private-use letters map to Unicode math.
+
+`tools/ppt-verify.ps1 -Slides` accepts `1,2,23` and `1 2 23`. `TestTextRecall` compares pdftotext words with the text stored in the PPTX.
+
 ## 1.3.5
 
 PowerPoint is the renderer these files have to satisfy. Three things LibreOffice did not show:

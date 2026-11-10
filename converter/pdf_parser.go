@@ -172,7 +172,7 @@ func shapeFromPDF(sh *gopdf2.ShapeObject) ShapeElement {
 		HasStroke: sh.HasStroke, StrokeR: sh.StrokeR, StrokeG: sh.StrokeG, StrokeB: sh.StrokeB,
 		StrokeWidth: sh.StrokeWidth, EvenOdd: sh.EvenOdd, SimpleRect: sh.SimpleRect,
 	}
-	if elem.FillAlpha <= 0 {
+	if elem.FillAlpha < 0 {
 		elem.FillAlpha = 1
 	}
 	for _, op := range sh.Path {

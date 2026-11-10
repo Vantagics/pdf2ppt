@@ -501,6 +501,31 @@ var (
 )
 
 func parseCMap(s string, f *pdfFont) {
+	// Acrobat PDFMaker writes a <0000> <FFFF> codespace on a WinAnsi font
+	// whose bfchar keys are one byte. Trusting the codespace pairs bytes,
+	// so "(th)" becomes one unmapped code and the letters disappear.
+	maxBytes := 0
+	note := func(hex string) {
+		n := (len(hex) + 1) / 2
+		if n > maxBytes {
+			maxBytes = n
+		}
+	}
+	for _, m := range bfCharRe.FindAllStringSubmatch(s, -1) {
+		pairs := hexTokRe.FindAllStringSubmatch(m[1], -1)
+		for i := 0; i+1 < len(pairs); i += 2 {
+			note(pairs[i][1])
+			code := hexToCode(pairs[i][1])
+			f.toUni[code] = utf16Hex(pairs[i+1][1])
+		}
+	}
+	for _, m := range bfRangeRe.FindAllStringSubmatch(s, -1) {
+		parseBFRange(m[1], f, note)
+	}
+	if maxBytes > 0 {
+		f.codeLen = maxBytes
+		return
+	}
 	if m := regexp.MustCompile(`(?s)begincodespacerange\s*(.*?)\s*endcodespacerange`).FindStringSubmatch(s); m != nil {
 		if cs := codeSpace.FindStringSubmatch(m[1]); cs != nil {
 			n := (len(cs[1]) + 1) / 2
@@ -509,19 +534,9 @@ func parseCMap(s string, f *pdfFont) {
 			}
 		}
 	}
-	for _, m := range bfCharRe.FindAllStringSubmatch(s, -1) {
-		pairs := hexTokRe.FindAllStringSubmatch(m[1], -1)
-		for i := 0; i+1 < len(pairs); i += 2 {
-			code := hexToCode(pairs[i][1])
-			f.toUni[code] = utf16Hex(pairs[i+1][1])
-		}
-	}
-	for _, m := range bfRangeRe.FindAllStringSubmatch(s, -1) {
-		parseBFRange(m[1], f)
-	}
 }
 
-func parseBFRange(body string, f *pdfFont) {
+func parseBFRange(body string, f *pdfFont, note func(string)) {
 	lines := strings.FieldsFunc(body, func(r rune) bool { return r == '\n' || r == '\r' })
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -532,6 +547,8 @@ func parseBFRange(body string, f *pdfFont) {
 		if len(hexes) < 2 {
 			continue
 		}
+		note(hexes[0][1])
+		note(hexes[1][1])
 		start := hexToCode(hexes[0][1])
 		end := hexToCode(hexes[1][1])
 		if len(hexes) >= 3 && !strings.Contains(line, "[") {

@@ -5,12 +5,16 @@
 #
 #   powershell -STA -File tools/ppt-verify.ps1 -Path deck.pptx -Slides 1,23 -OutDir ppt-verify
 #
+# -Slides accepts "1,2,23", "1 2 23", or a PowerShell array. A bare int array
+# is not used: from an already-open PowerShell host, -File binds "1,2,23" as
+# one string and [int] would read it as 1223.
+#
 # A hung repair dialog is stopped after -TimeoutSec. PowerPoint processes
 # that this script started are closed. PowerPoint that was already open is
 # left alone.
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [int[]]$Slides = @(1),
+    [string]$Slides = "1",
     [string]$OutDir = "ppt-verify",
     [int]$TimeoutSec = 90
 )
@@ -64,7 +68,12 @@ try {
     $expW = 1920
     $expH = [int][Math]::Round(1920 * $h / [Math]::Max($w, 1))
     if ($expH -lt 1) { $expH = 1 }
-    foreach ($n in $Slides) {
+    $slideNums = @()
+    foreach ($part in ($Slides -split '[,\s;]+')) {
+        if ($part -match '^\d+$') { $slideNums += [int]$part }
+    }
+    if ($slideNums.Count -eq 0) { $slideNums = @(1) }
+    foreach ($n in $slideNums) {
         if ($n -lt 1 -or $n -gt $pres.Slides.Count) {
             Write-Output "EXPORT_FAIL: $n out of range"
             continue

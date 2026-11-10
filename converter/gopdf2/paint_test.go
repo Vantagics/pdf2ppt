@@ -240,6 +240,27 @@ func TestVerticalPDFOpens(t *testing.T) {
 	if !strings.Contains(b.String(), "あいうえお") {
 		t.Fatalf("vertical text missing: %q", b.String())
 	}
+	var kana, kanji *TextObject
+	for _, tb := range p.TextObjects {
+		if strings.Contains(tb.Content, "あいうえお") {
+			kana = tb
+		}
+		if strings.Contains(tb.Content, "日本語") {
+			kanji = tb
+		}
+	}
+	if kana == nil || kanji == nil {
+		t.Fatal("the two columns were merged into one box")
+	}
+	if !kana.Vertical || !kanji.Vertical {
+		t.Fatal("Identity-V text was not marked vertical")
+	}
+	if kana.Height <= kana.Width || kanji.Height <= kanji.Width {
+		t.Fatalf("columns are not taller than wide: kana %.1fx%.1f kanji %.1fx%.1f", kana.Width, kana.Height, kanji.Width, kanji.Height)
+	}
+	if kanji.X >= kana.X {
+		t.Fatalf("日本語 should be the left column, x %.1f vs あいうえお x %.1f", kanji.X, kana.X)
+	}
 }
 
 func TestHebrewReadingOrder(t *testing.T) {
@@ -268,6 +289,160 @@ func TestHebrewReadingOrder(t *testing.T) {
 	}
 	if !rtl {
 		t.Fatal("hebrew box was not marked rtl")
+	}
+	if strings.Contains(b.String(), "בנישאילנה") || !strings.Contains(b.String(), "אילנה בניש") {
+		t.Fatalf("name is glued or swapped: %q", b.String())
+	}
+	p2, err := doc.GetPage(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var line string
+	for _, tb := range p2.TextObjects {
+		if strings.Contains(tb.Content, "1,600,000") {
+			line = tb.Content
+			break
+		}
+	}
+	if line == "" {
+		t.Fatal("page 2 lost the 1,600,000 line")
+	}
+	if strings.Index(line, "בישראל") < 0 || strings.Index(line, "בישראל") > strings.Index(line, "1,600,000") {
+		t.Fatalf("number is on the wrong side of בישראל: %q", line)
+	}
+	if !strings.Contains(line, "גיל 60") && !strings.Contains(line, "גיל  60") {
+		t.Fatalf("60 is not at the end of the line: %q", line)
+	}
+	var bcg, fifty string
+	for _, tb := range p2.TextObjects {
+		if strings.Contains(tb.Content, "BCG") {
+			bcg = tb.Content
+		}
+		if strings.Contains(tb.Content, "50") {
+			fifty = tb.Content
+		}
+	}
+	if bcg == "" || strings.Contains(bcg, "GCB") {
+		t.Fatalf("BCG run was reversed: %q", bcg)
+	}
+	if strings.Contains(fifty, "50מעל") || strings.HasPrefix(strings.TrimSpace(fifty), "50") && strings.Contains(fifty, "•") {
+		t.Fatalf("50 jumped next to the bullet: %q", fifty)
+	}
+	if !strings.Contains(fifty, "ל 50") && !strings.Contains(fifty, "ל50") {
+		t.Fatalf("50 is not after ל: %q", fifty)
+	}
+}
+
+func TestRTLLineReadingOrder(t *testing.T) {
+	right := &TextObject{Content: "אילנה", X: 80, Y: 10, Width: 40, Height: 16, FontSize: 16, RTL: true}
+	left := &TextObject{Content: "בניש", X: 30, Y: 10, Width: 36, Height: 16, FontSize: 16, RTL: true}
+	num := &TextObject{Content: "1,600,000", X: 40, Y: 40, Width: 70, Height: 16, FontSize: 16}
+	heb := &TextObject{Content: "בישראל", X: 120, Y: 40, Width: 50, Height: 16, FontSize: 16, RTL: true}
+	bullet := &TextObject{Content: "•", X: 180, Y: 40, Width: 10, Height: 16, FontSize: 16}
+	p := &Page{Elements: []PageElement{{Text: left}, {Text: right}, {Text: num}, {Text: heb}, {Text: bullet}}}
+	reorderRTLLines(p)
+	var name, line string
+	for _, el := range p.Elements {
+		if el.Text == nil {
+			continue
+		}
+		if strings.Contains(el.Text.Content, "אילנה") {
+			name = el.Text.Content
+		}
+		if strings.Contains(el.Text.Content, "1,600,000") {
+			line = el.Text.Content
+		}
+	}
+	if name != "אילנה בניש" {
+		t.Fatalf("name %q", name)
+	}
+	if line != "• בישראל 1,600,000" {
+		t.Fatalf("line %q", line)
+	}
+}
+
+func TestLatinLigatureFolds(t *testing.T) {
+	if foldLatinLigature("ffi", 600) != "\uFB03" {
+		t.Fatal("ffi stayed three letters")
+	}
+	if foldLatinLigature("ffl", 700) != "\uFB04" {
+		t.Fatal("ffl stayed three letters")
+	}
+	if foldLatinLigature("office", 3000) != "office" {
+		t.Fatal("a word was folded")
+	}
+	if foldLatinLigature("ffi", 4000) != "ffi" {
+		t.Fatal("a wide ffi was folded")
+	}
+}
+
+func TestWhiteRectOnTextIsDropped(t *testing.T) {
+	text := &TextObject{Content: "简单.创造.不简单", X: 173, Y: 143, Width: 247, Height: 31, FontSize: 22}
+	behind := &ShapeObject{X: 161, Y: 133, Width: 69, Height: 47, HasFill: true, SimpleRect: true, FillR: 255, FillG: 255, FillB: 255, FillAlpha: 1}
+	over := &ShapeObject{X: 250, Y: 133, Width: 69, Height: 47, HasFill: true, SimpleRect: true, FillR: 255, FillG: 255, FillB: 255, FillAlpha: 1}
+	p := &Page{Elements: []PageElement{{Shape: behind}, {Text: text}, {Shape: over}}}
+	dropWhiteTextCovers(p)
+	if p.Elements[0].Shape == nil {
+		t.Fatal("the plate behind the text was removed")
+	}
+	foundOver := false
+	for _, el := range p.Elements {
+		if el.Shape == over {
+			foundOver = true
+		}
+	}
+	if foundOver {
+		t.Fatal("the white plate on top of the subtitle is still there")
+	}
+}
+
+func TestWPSOfficeTitle(t *testing.T) {
+	pdf := corpusFile("wps-office2019")
+	if pdf == "" {
+		t.Skip("wps deck not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := doc.GetPage(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var title, sub string
+	var subBox *TextObject
+	for _, tb := range p.TextObjects {
+		if strings.Contains(tb.Content, "WPS") || strings.Contains(tb.Content, "ffi") || strings.Contains(tb.Content, "\uFB03") {
+			title += tb.Content
+		}
+		if strings.Contains(tb.Content, "简单") {
+			sub = tb.Content
+			subBox = tb
+		}
+	}
+	office := false
+	for _, tb := range p.TextObjects {
+		if strings.Contains(tb.Content, "Office") {
+			office = true
+		}
+	}
+	if !office {
+		t.Fatalf("Office is still split: %q", title)
+	}
+	if !strings.Contains(sub, "创造") || !strings.Contains(sub, "不简单") {
+		t.Fatalf("subtitle missing: %q", sub)
+	}
+	for _, el := range p.Elements {
+		sh := el.Shape
+		if sh == nil || subBox == nil {
+			continue
+		}
+		if sh.FillR < 250 || !sh.HasFill || !sh.SimpleRect {
+			continue
+		}
+		if sh.X > subBox.X+30 && whiteCoversText(sh, subBox) {
+			t.Fatalf("white rect still covers the subtitle: %.1f,%.1f %.1fx%.1f", sh.X, sh.Y, sh.Width, sh.Height)
+		}
 	}
 }
 

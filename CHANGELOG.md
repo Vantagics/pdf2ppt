@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.1
+
+Identity-V text is a vertical column. `jp-tategaki` page 1 was one 63.8×10.6 pt horizontal box, so PowerPoint drew 日本語あ and clipped いうえお. The two shows are now `bodyPr vert="eaVert"`: あいうえお at x=229, 9.7×48.4 pt, and 日本語 one column to its left. The box is taller than it is wide.
+
+Hebrew lines are reordered from the right. Each fragment was already logical, and joining them left to right glued the name into בנישאילנה and put 1,600,000 on the right of בישראל. A gap between two words is a space, and digits and Latin stay in their own order. Page 1 reads אילנה בניש. Page 2 reads • בישראל 1,600,000 … גיל 60, with BCG and 50 in the same places as `pdftotext -layout`.
+
+DeviceGray JPEG is passed through, the same way RGB JPEG already was. The OICW scan was 73 gray pages re-encoded as RGB, 21 MB of PDF becoming a 34 MB PPTX. It is 21.0 MB now, under the PDF size × 1.05. Page 1 is the one taller page (657 pt into a 604 pt slide). It fills the slide width and the extra height is clipped, instead of shrinking onto white bars.
+
+`wps-office2019` page 1 drew "Office" as two boxes, "WPS Offi" and "ce 2019", because the ffi letters overlapped "ce" enough to be treated as a second copy. They are one line again. The subtitle 简单.创造.不简单 was a complete `a:t` run covered by white rectangles the size of 创造 and 不简单. Those plates, painted after the text, are dropped. A white rectangle painted before the text stays.
+
+`undp-gender-ar` page 10 still has only the short labels in `a:t`. The headings and body are not Type3, not a clip, and not a form. Each line is a 2×2 indexed image with a 1-bit soft mask the size of the glyphs (about 2000×156). `pdftotext` sees the same gap. The deck has 1116 of those masks. Expanding them would paint the lines and push the file past the size gate, so they stay as they are.
+
 ## 1.5.0
 
 Six public PDFs join the corpus, and two holes they hit are closed.

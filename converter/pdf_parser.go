@@ -132,6 +132,7 @@ func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 		Clip:        textObj.Clip,
 		NoFill:      textObj.NoFill,
 		RTL:         textObj.RTL,
+		Vertical:    textObj.Vertical,
 	}
 	for _, r := range textObj.Runs {
 		elem.Runs = append(elem.Runs, TextRun{

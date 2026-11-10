@@ -76,6 +76,7 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	// Before merge, while "(" is still its own glyph. The split marks that
 	// glyph so merge does not pull it back into the run it was covering.
 	uncoverOverlaidGlyphs(page)
+	reorderRTLLines(page)
 	mergeTextLines(page)
 	attachSubscripts(page)
 	closeSubscriptHoles(page)
@@ -83,6 +84,7 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 	pullBackOverlaps(page)
 	replaceIsolatedSymbols(page)
 	coalesceGlyphShapes(page)
+	dropWhiteTextCovers(page)
 	page.syncLists()
 	return page, nil
 }

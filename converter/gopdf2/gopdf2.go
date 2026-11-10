@@ -73,6 +73,9 @@ type TextObject struct {
 	NoFill bool
 	// RTL is set when the text is Hebrew or Arabic in logical order.
 	RTL bool
+	// Vertical is East Asian top-to-bottom text (Identity-V / WMode 1).
+	// The box is one column: narrow, and taller than it is wide.
+	Vertical bool
 	// symbolProg is the embedded font for a one-character symbolic run.
 	// replaceIsolatedSymbols draws it when the run stays isolated.
 	symbolProg []byte

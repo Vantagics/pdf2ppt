@@ -21,7 +21,7 @@ func mergeTextLines(p *Page) {
 	var refs []textRef
 	for i := range p.Elements {
 		t := p.Elements[i].Text
-		if t == nil || !horizontal(t.Rotation) {
+		if t == nil || t.Vertical || !horizontal(t.Rotation) {
 			continue
 		}
 		refs = append(refs, textRef{i, t})
@@ -151,11 +151,27 @@ func contiguous(g []textRef, t *TextObject) bool {
 	if gap < 0 {
 		overlap := -gap
 		shorter := math.Min(prev.Width, t.Width)
-		if shorter > 0 && overlap > shorter*0.55 {
+		// A deep overlap is a second copy or a glyph sitting on the next
+		// word (the KUST parenthesis). A fraction of an em is the ffi
+		// letters of "Office" running into "ce": one line, not two boxes.
+		if shorter > 0 && overlap > shorter*0.55 && (overlap > em*0.45 || !latinJoin(prev.Content, t.Content)) {
 			return false
 		}
 	}
 	return gap <= em*0.85
+}
+
+func latinJoin(left, right string) bool {
+	lr := []rune(strings.TrimRight(left, " "))
+	rr := []rune(strings.TrimLeft(right, " "))
+	if len(lr) == 0 || len(rr) == 0 {
+		return false
+	}
+	return isLatinLetter(lr[len(lr)-1]) && isLatinLetter(rr[0])
+}
+
+func isLatinLetter(r rune) bool {
+	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')
 }
 
 func buildMerged(ts []*TextObject) *TextObject {
@@ -344,7 +360,7 @@ func attachSubscripts(p *Page) {
 	var refs []ref
 	for i := range p.Elements {
 		t := p.Elements[i].Text
-		if t == nil || !horizontal(t.Rotation) || t.Content == "" {
+		if t == nil || t.Vertical || !horizontal(t.Rotation) || t.Content == "" {
 			continue
 		}
 		refs = append(refs, ref{i, t})
@@ -927,7 +943,7 @@ func pullBackOverlaps(p *Page) {
 	var refs []textRef
 	for i := range p.Elements {
 		t := p.Elements[i].Text
-		if t == nil || !horizontal(t.Rotation) {
+		if t == nil || t.Vertical || !horizontal(t.Rotation) {
 			continue
 		}
 		refs = append(refs, textRef{i, t})

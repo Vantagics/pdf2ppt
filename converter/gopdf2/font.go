@@ -108,6 +108,9 @@ type pdfFont struct {
 	symbolic bool
 	// japan1 means an Adobe-Japan1 CID font with no usable ToUnicode entry.
 	japan1 bool
+	// vertical is Identity-V or a CID font with WMode 1. Glyphs stack
+	// downward from the origin, which is the top center of the column.
+	vertical bool
 	// program is the embedded FontFile2 (TrueType) or FontFile3 (CFF/OpenType).
 	program []byte
 	t3      *type3Font
@@ -131,7 +134,7 @@ func (f *pdfFont) decodeBytes(raw []byte, fontSize, charSp, wordSp, hScale float
 		for k := 0; k < step; k++ {
 			code = code<<8 | uint64(raw[i+k])
 		}
-		s := f.unicode(code, raw[i])
+		s := foldLatinLigature(f.unicode(code, raw[i]), f.widthOf(int(code)))
 		var ch rune
 		if rs := []rune(s); len(rs) == 1 {
 			ch = rs[0]
@@ -287,6 +290,27 @@ func (f *pdfFont) widthOf(code int) float64 {
 // glyphAdvance is the horizontal displacement in text space (points when the
 // text matrix is unscaled). numAdjust is a TJ number (thousandths of em,
 // negative moves right) and is not included here.
+// foldLatinLigature turns one glyph whose ToUnicode is "ffi" into U+FB03.
+// The PDF advance is one glyph. Leaving the three letters makes PowerPoint
+// draw "Offi ce": the run is three times as wide as the glyph, and the next
+// box ("ce") starts where the ligature ended.
+func foldLatinLigature(s string, width1000 float64) string {
+	var repl string
+	switch s {
+	case "ffi":
+		repl = "\uFB03"
+	case "ffl":
+		repl = "\uFB04"
+	default:
+		return s
+	}
+	n := len([]rune(s))
+	if width1000 > 900*float64(n) {
+		return s
+	}
+	return repl
+}
+
 func glyphAdvance(width, fontSize, charSp, wordSp, hScale float64, ch rune) float64 {
 	if hScale == 0 {
 		hScale = 100
@@ -385,8 +409,11 @@ func parseFont(xrd *model.XRefTable, obj types.Object) *pdfFont {
 	}
 	if enc := d.NameEntry("Encoding"); enc != nil {
 		switch *enc {
-		case "Identity-H", "Identity-V":
+		case "Identity-H":
 			f.codeLen = 2
+		case "Identity-V":
+			f.codeLen = 2
+			f.vertical = true
 		case "WinAnsiEncoding":
 			f.enc = charmapTable(charmap.Windows1252)
 		case "MacRomanEncoding":
@@ -410,6 +437,9 @@ func parseFont(xrd *model.XRefTable, obj types.Object) *pdfFont {
 		if err == nil && dd != nil {
 			if cidOrdering(xrd, dd) == "Japan1" {
 				f.japan1 = true
+			}
+			if numEntry(xrd, dd, "WMode") == 1 {
+				f.vertical = true
 			}
 			applyCIDWidths(xrd, dd, f)
 			applyDescriptor(xrd, dd, f)

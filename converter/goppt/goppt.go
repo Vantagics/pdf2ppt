@@ -54,6 +54,7 @@ type TextBox struct {
 	Clip        bool
 	NoFill      bool
 	RTL         bool
+	Vertical    bool
 	Runs        []TextRun
 }
 

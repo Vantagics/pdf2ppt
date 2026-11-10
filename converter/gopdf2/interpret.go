@@ -1354,6 +1354,13 @@ func (ip *interp) td(tx, ty float64) {
 }
 
 func (ip *interp) advance(tx float64) {
+	// WMode 1 moves down the column by the glyph width. A horizontal
+	// advance laid あいうえお out in one short line.
+	if ip.gs.font != nil && ip.gs.font.vertical {
+		ip.tm[4] += -tx * ip.tm[2]
+		ip.tm[5] += -tx * ip.tm[3]
+		return
+	}
 	ip.tm[4] += tx * ip.tm[0]
 	ip.tm[5] += tx * ip.tm[1]
 }
@@ -1556,12 +1563,18 @@ func (ip *interp) emitText(text string, textAdv float64) {
 	// whose advance is mostly Tc (the KUST parenthesis) is real ink and
 	// must not be inflated: that grew "(" until it covered z₁.
 	mostlySpacing := textAdv > 0 && ip.gs.charSp*th > textAdv*0.45
-	if !mostlySpacing && pdfWidth < eff*0.4 {
+	vertical := ip.gs.font != nil && ip.gs.font.vertical
+	if !vertical && !mostlySpacing && pdfWidth < eff*0.4 {
 		pdfWidth = float64(utf8.RuneCountInString(text)) * eff * 0.55
 	}
 	// Fit the fallback font to the PDF advance before the box is padded,
-	// so a wider substitute cannot paint into the next run.
-	family, eff, tracking := fitRun(family, bold, italic, eff, pdfWidth, text)
+	// so a wider substitute cannot paint into the next run. A vertical
+	// column is one em wide and several glyphs tall; fitting the whole
+	// string into that width would shrink あいうえお to nothing.
+	tracking := 0.0
+	if !vertical {
+		family, eff, tracking = fitRun(family, bold, italic, eff, pdfWidth, text)
+	}
 	// A small right-bearing pad keeps the last glyph inside the box.
 	// It is not extra ink: tracking already pulled the glyphs to pdfWidth.
 	width := pdfWidth + math.Min(eff*0.08, 1.2)
@@ -1595,14 +1608,38 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		xLeft = cx - width/2
 		yTop = cy - height/2
 	}
+	if vertical {
+		// The origin is the top center of the first glyph. eaVert draws
+		// downward inside a box that is one em wide and the column tall.
+		width = eff * 1.05
+		if width < 1 {
+			width = 1
+		}
+		vx, vy := ip.tm.applyVec(0, -inkAdv)
+		px, py := ip.gs.ctm.applyVec(vx, vy)
+		height = math.Hypot(px, py)
+		n := float64(utf8.RuneCountInString(text))
+		if n < 1 {
+			n = 1
+		}
+		if height < eff*n*0.55 {
+			height = eff * n
+		}
+		height += eff * 0.1
+		xLeft = bx - ip.originX - width/2
+		yTop = (ip.originY + ip.pageH) - by
+		tracking = 0
+		rot = 0
+	}
 	rtl := false
-	if hasRTLScript(text) {
+	if !vertical && hasRTLScript(text) {
 		text = visualLTRToLogical(text)
 		rtl = true
 	}
 	tb := &TextObject{
 		Content:     text,
 		RTL:         rtl,
+		Vertical:    vertical,
 		FontName:    family,
 		FontSize:    eff,
 		Bold:        bold,

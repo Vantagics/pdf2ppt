@@ -30,6 +30,7 @@ type pictureBaseline struct {
 // fixture and the known-blocked URLs: tsmc (Cloudflare 403), korea-privacy
 // (expired attachment link), and nrcs-cattle-distiller (the host accepts TLS
 // and then sends no bytes). v1.5.0 adds six more fetchable decks.
+// v1.5.1 keeps that set and caps the OICW scan at 1.05 times the PDF.
 const requiredCorpusDecks = 39
 
 type corpusGate struct {
@@ -93,6 +94,15 @@ func TestPictureCountBaseline(t *testing.T) {
 				}
 				if st.Size() > int64(float64(want.SizeV140)*1.10) {
 					t.Fatalf("pptx is %d bytes, more than 10%% over the v1.4.0 size %d", st.Size(), want.SizeV140)
+				}
+				if name == "oicw-1996-scan" {
+					pdfSt, err := os.Stat(pdf)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if st.Size() > int64(float64(pdfSt.Size())*1.05) {
+						t.Fatalf("oicw pptx is %d bytes, more than 5%% over the PDF %d", st.Size(), pdfSt.Size())
+					}
 				}
 			}
 			if pics < want.Pics {

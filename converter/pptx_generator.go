@@ -82,6 +82,7 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				Clip:        te.Clip,
 				NoFill:      te.NoFill,
 				RTL:         te.RTL,
+				Vertical:    te.Vertical,
 			}
 			for _, r := range te.Runs {
 				tb.Runs = append(tb.Runs, goppt.TextRun{

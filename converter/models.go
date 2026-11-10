@@ -46,6 +46,7 @@ type TextElement struct {
 	Clip        bool      `json:"clip,omitempty"`
 	NoFill      bool      `json:"noFill,omitempty"`
 	RTL         bool      `json:"rtl,omitempty"`
+	Vertical    bool      `json:"vertical,omitempty"`
 	Runs        []TextRun `json:"runs,omitempty"`
 }
 

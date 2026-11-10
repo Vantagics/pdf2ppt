@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.1
+
+`jp-tategaki` page 1 is two `vert="eaVert"` columns, あいうえお on the right and 日本語 on the left, each taller than it is wide. `he-openu-a11y` page 1 reads אילנה בניש, and page 2 keeps 1,600,000, BCG, and 50 in `pdftotext -layout` order. `oicw-1996-scan` stays at or under the PDF size × 1.05 (21.0 MB from a 22.5 MB PDF). Page 1 fills the slide width. `wps-office2019` page 1 is one "WPS Office 2019" line, and the subtitle is not covered by white rectangles. `undp-gender-ar` page 10 body text is a 1-bit soft mask on a 2×2 image, not extractable text.
+
 ## v1.5.0
 
 Six decks are fetched with the rest of the corpus: `jp-tategaki` (vertical Japanese, Identity-V), `he-openu-a11y` (Hebrew PowerPoint, ToUnicode), `who-tb2023` (chart slides), `arcourts-ppt` (widescreen handout with soft masks), `wps-office2019` (102-page WPS guide), `oicw-1996-scan` (74-page image-only scan). The gate count is 39. `tsmc-2q25-zh` concatenated tokens are 261; that is the footer `© 2025 TSMC, Ltd`, not a missing token.

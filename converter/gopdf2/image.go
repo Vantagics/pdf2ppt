@@ -55,7 +55,11 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 	}
 	decode := decodeArray(xrd, sd.Dict)
 	invert := decodeInverts(decode, ncomp)
-	needPixels := smask != nil || opacity < 0.999 || invert || csName != "rgb" || bpc != 8
+	// DeviceGray DCT is already a JPEG. Decoding it and writing an RGB
+	// JPEG is what grew the OICW scan from about 21 MB to 36 MB. CMYK
+	// and indexed images still have to be re-encoded.
+	colorNeedsPixels := csName != "rgb" && csName != "gray"
+	needPixels := smask != nil || opacity < 0.999 || invert || colorNeedsPixels || bpc != 8
 
 	if isJPEG(raw) && !needPixels {
 		return raw, "jpeg", nil

@@ -22,6 +22,32 @@ func TestDominantSizeTieUsesFirstPage(t *testing.T) {
 	}
 }
 
+func TestSlightlyTallerPageFillsTheWidth(t *testing.T) {
+	p := NewPresentation()
+	// 777.6 x 604.32 pt, twice, then one page 777.6 x 657.12 pt.
+	p.AddSlide(9875520, 7674864)
+	p.AddSlide(9875520, 7674864)
+	odd := p.AddSlide(9875520, 8345424)
+	if err := odd.AddImage(&Image{Data: []byte{1}, Format: "jpeg", X: 0, Y: 0, Width: 9875520, Height: 8345424}); err != nil {
+		t.Fatal(err)
+	}
+	p.fitSlides()
+	s, err := p.GetSlide(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, ok := s.Elements[0].(*Image)
+	if !ok {
+		t.Fatalf("element %#v", s.Elements[0])
+	}
+	if img.Width < 9800000 {
+		t.Fatalf("page shrank to width %d, want the slide filled", img.Width)
+	}
+	if img.Y >= 0 {
+		t.Fatalf("extra height was letterboxed, y=%d", img.Y)
+	}
+}
+
 func TestLetterboxScalesDownAndCenters(t *testing.T) {
 	p := NewPresentation()
 	// Counts tie, so the first page is the slide size. Both axes are

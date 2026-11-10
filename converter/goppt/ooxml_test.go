@@ -45,6 +45,20 @@ func TestRTLParagraph(t *testing.T) {
 	}
 }
 
+func TestVerticalPDFWritesEaVert(t *testing.T) {
+	xml := formatTextBox(&TextBox{
+		Content: "あいうえお", FontName: "Noto Sans CJK JP", FontSize: 12,
+		Width: 140000, Height: 700000, Vertical: true,
+	}, 3)
+	if !strings.Contains(xml, `vert="eaVert"`) {
+		t.Fatalf("vertical body missing: %s", xml)
+	}
+	plain := formatTextBox(&TextBox{Content: "Hello", FontName: "Arial", FontSize: 18, Width: 200, Height: 40}, 4)
+	if strings.Contains(plain, `vert=`) {
+		t.Fatalf("horizontal box grew vert: %s", plain)
+	}
+}
+
 func TestSubscriptBaseline(t *testing.T) {
 	xml := formatTextRun(&TextBox{}, TextRun{
 		Content: "2", FontName: "Tinos", FontSize: 17, Baseline: -25000,

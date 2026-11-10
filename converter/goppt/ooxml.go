@@ -178,7 +178,11 @@ func formatTextBox(tb *TextBox, id int) string {
 	if tb.Clip {
 		overflow = "clip"
 	}
-	sb.WriteString(fmt.Sprintf(`<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t" horzOverflow="%s" vertOverflow="overflow"/>`, overflow))
+	vert := ""
+	if tb.Vertical {
+		vert = ` vert="eaVert"`
+	}
+	sb.WriteString(fmt.Sprintf(`<p:txBody><a:bodyPr%s wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t" horzOverflow="%s" vertOverflow="overflow"/>`, vert, overflow))
 	sb.WriteString(`<a:lstStyle/>`)
 	// 100% line spacing keeps the first baseline on the font's em box. The
 	// default (omitted) spacing adds external leading and drops the glyphs.

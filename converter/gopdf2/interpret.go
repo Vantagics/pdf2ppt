@@ -1189,17 +1189,71 @@ func pathBounds(ops []pathOp) (minX, minY, maxX, maxY float64, ok bool) {
 			maxY = y
 		}
 	}
+	var cx, cy float64
+	have := false
 	for _, o := range ops {
 		switch o.op {
 		case 'M', 'L':
 			consider(o.x, o.y)
+			cx, cy = o.x, o.y
+			have = true
 		case 'C':
-			consider(o.x1, o.y1)
-			consider(o.x2, o.y2)
-			consider(o.x, o.y)
+			if !have {
+				cx, cy = o.x1, o.y1
+			}
+			// Control points sit outside a rounded corner. The box of the
+			// controls is taller than the curve and keeps the footer under
+			// the NeurIPS chart. Use the curve's own extremes.
+			xLo, xHi := bezExtrema(cx, o.x1, o.x2, o.x)
+			yLo, yHi := bezExtrema(cy, o.y1, o.y2, o.y)
+			consider(xLo, yLo)
+			consider(xHi, yHi)
+			cx, cy = o.x, o.y
+			have = true
 		}
 	}
 	return
+}
+
+func bezExtrema(p0, p1, p2, p3 float64) (float64, float64) {
+	lo, hi := p0, p0
+	if p3 < lo {
+		lo = p3
+	}
+	if p3 > hi {
+		hi = p3
+	}
+	sample := func(t float64) {
+		if t <= 0 || t >= 1 {
+			return
+		}
+		u := 1 - t
+		v := u*u*u*p0 + 3*u*u*t*p1 + 3*u*t*t*p2 + t*t*t*p3
+		if v < lo {
+			lo = v
+		}
+		if v > hi {
+			hi = v
+		}
+	}
+	// B'(t) = 0 is a quadratic a t^2 + b t + c = 0.
+	a := -p0 + 3*p1 - 3*p2 + p3
+	b := 2*p0 - 4*p1 + 2*p2
+	c := -p0 + p1
+	if math.Abs(a) < 1e-9 {
+		if math.Abs(b) > 1e-9 {
+			sample(-c / b)
+		}
+		return lo, hi
+	}
+	disc := b*b - 4*a*c
+	if disc < 0 {
+		return lo, hi
+	}
+	s := math.Sqrt(disc)
+	sample((-b + s) / (2 * a))
+	sample((-b - s) / (2 * a))
+	return lo, hi
 }
 
 func isSimpleRect(ops []pathOp) bool {
@@ -1695,7 +1749,8 @@ func (ip *interp) emitTile(minX, minY, maxX, maxY float64) {
 				ip.res = im.res
 				if xo := im.res.xobject(im.name); xo != nil && xo.kind == "image" {
 					ip.paintImage(xo)
-					ip.clipLastImage(minX, minY, maxX, maxY)
+					// A tile that falls outside its cell is a duplicate. Drop it.
+					ip.clipLastImage(minX, minY, maxX, maxY, true)
 				}
 				ip.gs.ctm = savedCTM
 				ip.res = savedRes
@@ -1748,7 +1803,17 @@ func matrixBounds(m matrix) (minX, minY, maxX, maxY float64) {
 	return
 }
 
-func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64) {
+func (ip *interp) clipIsPage(minX, minY, maxX, maxY float64) bool {
+	if ip.pageW < 1 || ip.pageH < 1 {
+		return false
+	}
+	px0, py0 := ip.originX, ip.originY
+	px1, py1 := px0+ip.pageW, py0+ip.pageH
+	tolX, tolY := ip.pageW*0.04, ip.pageH*0.04
+	return minX <= px0+tolX && minY <= py0+tolY && maxX >= px1-tolX && maxY >= py1-tolY
+}
+
+func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64, dropOutside bool) {
 	if len(ip.elements) == 0 {
 		return
 	}
@@ -1756,6 +1821,12 @@ func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64) {
 	img := el.Image
 	if img == nil {
 		return
+	}
+	// A clip that is the page only trims what hangs off the slide. Cropping
+	// to a slightly inset page path is what cut the Canva diamonds.
+	if !dropOutside && ip.clipIsPage(minX, minY, maxX, maxY) {
+		minX, minY = ip.originX, ip.originY
+		maxX, maxY = ip.originX+ip.pageW, ip.originY+ip.pageH
 	}
 	imgMinX := img.X + ip.originX
 	imgMaxX := imgMinX + img.Width
@@ -1765,21 +1836,12 @@ func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64) {
 	cy0 := math.Max(minY, imgMinY)
 	cx1 := math.Min(maxX, imgMaxX)
 	cy1 := math.Min(maxY, imgMaxY)
-	// A clip that misses the picture entirely used to delete it. That dropped
-	// 13 pictures from the UAI keynote. Keep the picture.
 	if cx1-cx0 < 0.5 || cy1-cy0 < 0.5 {
-		return
-	}
-	area := img.Width * img.Height
-	inter := (cx1 - cx0) * (cy1 - cy0)
-	if area < 1 {
-		return
-	}
-	outside := 1 - inter/area
-	// A clip that only shaves the edge (Canva diamonds, a photo that hangs
-	// off the slide) must not crop. A real window, like the NeurIPS tweet
-	// card, removes more than a third of the picture.
-	if outside < 0.36 {
+		// Pattern cells drop a tile that missed the cell. A content clip
+		// does not delete the picture (that removed 13 UAI images).
+		if dropOutside {
+			ip.elements = ip.elements[:len(ip.elements)-1]
+		}
 		return
 	}
 	// Only axis-aligned placements can be cropped by a rectangle.
@@ -2184,7 +2246,7 @@ func (ip *interp) paintImage(xo *xobject) {
 	ip.seenContent = true
 	ip.elements = append(ip.elements, PageElement{Image: img})
 	if ip.gs.hasClip {
-		ip.clipLastImage(ip.gs.clipX0, ip.gs.clipY0, ip.gs.clipX1, ip.gs.clipY1)
+		ip.clipLastImage(ip.gs.clipX0, ip.gs.clipY0, ip.gs.clipX1, ip.gs.clipY1, false)
 	}
 }
 

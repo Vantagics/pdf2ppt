@@ -1,5 +1,11 @@
 # Compatibility notes
 
+## v1.4.1
+
+Non-page clips crop the picture again (NeurIPS chart footer, PSUMAC). A page clip only trims slide overflow. Pattern tiles outside their cell are dropped, so gzmtu and nbs picture counts match v1.3.7. Text tokens match v1.3.7 on the Rotary, Mahidol, and WPS decks. TencentSansW7 is bold.
+
+The KUST pressure formulas are still separate glyphs. Gluing a small digit onto the letter beside it also ate real numbers such as 2024.
+
 ## v1.4.0
 
 Edge clips no longer crop page-sized photos, so the Canva diamond fields keep the v1.3.7 placement. The script “Canva” wordmark is the axial shading behind each letter outline. The UAI keynote is back to 253 pictures. Mahidol captions stay white: a same-position duplicate keeps the lighter color. Indexed palette entries are not treated as gray.

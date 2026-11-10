@@ -61,6 +61,16 @@ func TestWinAnsiAccent(t *testing.T) {
 	}
 }
 
+func TestWeightSuffixIsBold(t *testing.T) {
+	fam, bold, italic := normalizeFontName("TencentSansW7")
+	if !bold || italic {
+		t.Fatalf("bold=%v italic=%v", bold, italic)
+	}
+	if fam != "Tencent Sans" {
+		t.Fatalf("family %q", fam)
+	}
+}
+
 func TestPDFMakerOneByteCMap(t *testing.T) {
 	f := &pdfFont{codeLen: 1, toUni: map[uint64]string{}, widths: map[int]float64{}, defWidth: 500}
 	parseCMap("begincodespacerange\n<0000> <FFFF>\nendcodespacerange\nbeginbfchar\n<74> <0074>\n<68> <0068>\n<4F> <004F>\n<52> <0052>\n<41> <0041>\n<54> <0054>\n<45> <0045>\n<20> <0020>\n<56> <0056>\n<49> <0049>\nendbfchar\n", f)

@@ -287,6 +287,11 @@ func normalizeFontName(base string) (family string, bold, italic bool) {
 	case strings.HasSuffix(base, "-Regular"), strings.HasSuffix(base, ",Regular"):
 		base = strings.TrimSuffix(strings.TrimSuffix(base, "-Regular"), ",Regular")
 	}
+	// Variable-font weight names: TencentSansW7 is weight 700.
+	if len(base) > 2 && (base[len(base)-2] == 'W' || base[len(base)-2] == 'w') && base[len(base)-1] >= '6' && base[len(base)-1] <= '9' {
+		bold = true
+		base = base[:len(base)-2]
+	}
 	if mapped, ok := knownFamilies[base]; ok {
 		return mapped, bold, italic
 	}
@@ -391,6 +396,11 @@ func applyDescriptor(xrd *model.XRefTable, d types.Dict, f *pdfFont) {
 		if fl&(1<<18) != 0 {
 			f.bold = true
 		}
+	}
+	// TencentSansW7 carries FontWeight 700 and no "-Bold" in the name.
+	// Without this, "CORPORATE OVERVIEW" is drawn in regular Noto Sans.
+	if w := numEntry(xrd, fd, "FontWeight"); w >= 600 {
+		f.bold = true
 	}
 	if f.family == "" || f.family == "Arial" {
 		if n := fd.NameEntry("FontName"); n != nil {

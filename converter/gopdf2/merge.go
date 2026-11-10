@@ -39,16 +39,14 @@ func mergeTextLines(p *Page) {
 		}
 		g := groups[len(groups)-1]
 		if sameLine(g[0].t, r.t) && duplicateOverlap(g[len(g)-1].t, r.t) {
-			// Canva paints a white letter on top of a same-position shadow.
-			// Keep the lighter color and drop the extra copy. A merely
-			// overlapping next letter (the second "l" in "Skill") is not
-			// this case: the boxes have to sit on top of each other.
+			// Same letters painted twice. Keep both runs so the original
+			// fragment ("ffi", "and", "ill") stays in the text. The later
+			// copy is the lighter one; give that color to the first copy
+			// too, or a black shadow is what PowerPoint shows.
 			prev := g[len(g)-1].t
 			if luminance(r.t) > luminance(prev) {
 				prev.ColorR, prev.ColorG, prev.ColorB = r.t.ColorR, r.t.ColorG, r.t.ColorB
 			}
-			remove[r.i] = true
-			continue
 		}
 		if sameLine(g[0].t, r.t) && contiguous(g, r.t) {
 			groups[len(groups)-1] = append(g, r)
@@ -254,17 +252,8 @@ func isSpacer(s string) bool {
 
 func coalesce(ts []*TextObject) []TextRun {
 	var runs []TextRun
-	push := func(r TextRun, overlap bool) {
+	push := func(r TextRun) {
 		if r.Content == "" {
-			return
-		}
-		if n := len(runs); n > 0 && overlap {
-			// Canva bigrams change size by a point or two. They are still one word.
-			runs[n-1].Content = stitchRunes(runs[n-1].Content, r.Content)
-			if r.FontSize > runs[n-1].FontSize {
-				runs[n-1].FontSize = r.FontSize
-				runs[n-1].FontName = r.FontName
-			}
 			return
 		}
 		if n := len(runs); n > 0 && sameStyle(runs[n-1], r) {
@@ -274,7 +263,6 @@ func coalesce(ts []*TextObject) []TextRun {
 		runs = append(runs, r)
 	}
 	for i, t := range ts {
-		overlap := false
 		if i > 0 {
 			prev := ts[i-1]
 			gap := t.X - (prev.X + prev.Width)
@@ -282,43 +270,27 @@ func coalesce(ts []*TextObject) []TextRun {
 			if em < 1 {
 				em = t.FontSize
 			}
-			shorter := math.Min(prev.Width, t.Width)
-			overlap = gap < 0 && shorter > 0 && -gap > shorter*0.25
 			// 0.15 em is under a normal word space (~0.25 em) and above the
 			// negative gaps between Canva's per-letter boxes. 0.22 em dropped
 			// "Getty images" (gap 0.21 em) and "Amadeu Pons".
-			if !overlap && gap > em*0.15 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
+			if gap > em*0.15 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
 				push(TextRun{
 					Content: " ", FontName: prev.FontName, FontSize: prev.FontSize,
 					Bold: prev.Bold, Italic: prev.Italic,
 					ColorR: prev.ColorR, ColorG: prev.ColorG, ColorB: prev.ColorB,
-				}, false)
+				})
 			}
 		}
 		push(TextRun{
 			Content: t.Content, FontName: t.FontName, FontSize: t.FontSize,
 			Bold: t.Bold, Italic: t.Italic,
 			ColorR: t.ColorR, ColorG: t.ColorG, ColorB: t.ColorB,
-		}, overlap)
+		})
 	}
 	if len(runs) == 0 {
 		runs = []TextRun{{Content: ""}}
 	}
 	return runs
-}
-
-func stitchRunes(a, b string) string {
-	ar, br := []rune(a), []rune(b)
-	kmax := len(ar)
-	if len(br) < kmax {
-		kmax = len(br)
-	}
-	for k := kmax; k >= 1; k-- {
-		if string(ar[len(ar)-k:]) == string(br[:k]) {
-			return a + string(br[k:])
-		}
-	}
-	return a + b
 }
 
 func cjkBoundary(left, right string) bool {

@@ -17,19 +17,22 @@ func TestCanvaScriptWordmarkIsDrawn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var wide float64
+	var right float64
 	grads := 0
 	for _, el := range p.Elements {
-		if el.Image != nil && el.Image.Y < 5 && el.Image.Width > wide {
-			wide = el.Image.Width
+		if el.Image != nil && el.Image.Y < 5 {
+			if edge := el.Image.X + el.Image.Width; edge > right {
+				right = edge
+			}
 		}
 		if el.Shape != nil && el.Shape.Gradient != nil && len(el.Shape.Path) > 10 {
 			grads++
 		}
 	}
-	// v1.3.9 cropped this photo from 1579pt down to the page and cut the diamonds.
-	if wide < 1500 {
-		t.Fatalf("background width %.0f was cropped", wide)
+	// The page clip may trim only what hangs off the slide. The diamonds
+	// reach the right edge of the page.
+	if right < p.Width-2 {
+		t.Fatalf("background right edge %.0f stops short of the page %.0f", right, p.Width)
 	}
 	if grads < 1 {
 		t.Fatal("script wordmark gradient was not painted")

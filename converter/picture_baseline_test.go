@@ -60,8 +60,8 @@ func TestPictureCountBaseline(t *testing.T) {
 			}
 			if want.Tokens > 0 {
 				got := pptxTokens(t, out)
-				// One percent: a fix must not trade away another deck's text.
-				if float64(got) < float64(want.Tokens)*0.99 {
+				// 0.3 percentage points of the stored token count.
+				if float64(got) < float64(want.Tokens)*0.997 {
 					t.Fatalf("unique latin tokens %d, v1.3.7 baseline %d", got, want.Tokens)
 				}
 			}

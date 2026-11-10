@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.1
+
+A rectangular clip crops the picture to that rectangle again, so the NeurIPS adoption chart loses the footer and the junk URL that v1.4.0 let back in. A clip that is the page only trims what hangs off the slide, which keeps the Canva diamonds. A picture that misses the clip is not deleted. A pattern tile that misses its cell is still dropped, so gzmtu and nbs-alibaba are not bloated with duplicate tiles.
+
+Rounded-corner clips use the curve itself, not the control points, so the box is not tall enough to keep the footer.
+
+Text fragments are no longer stitched, so the v1.3.7 tokens (`and`, `ffi`, `ill`) stay in the file. A same-position copy still lends its lighter color to the first copy. The recall gate fails if a deck loses more than 0.3% of its stored tokens.
+
+`CORPORATE OVERVIEW` is bold: the face is TencentSansW7 with FontWeight 700, which is not a "-Bold" suffix.
+
 ## 1.4.0
 
 v1.3.9 cropped every picture against the current clip, including photos that only hang off the edge of the slide. That cut the Canva diamonds and, on the UAI keynote, deleted 13 pictures whose boxes missed the clip. A clip now crops a picture only when it removes more than about a third of the picture (the NeurIPS tweet card). A picture that misses the clip entirely stays.

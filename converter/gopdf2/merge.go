@@ -39,8 +39,14 @@ func mergeTextLines(p *Page) {
 		}
 		g := groups[len(groups)-1]
 		if sameLine(g[0].t, r.t) && duplicateOverlap(g[len(g)-1].t, r.t) {
-			// Canva paints every letter twice. The second copy must not start
-			// a new word, or "R e e a" becomes the boxes "Re" and "ea".
+			// Canva paints a white letter on top of a same-position shadow.
+			// Keep the lighter color and drop the extra copy. A merely
+			// overlapping next letter (the second "l" in "Skill") is not
+			// this case: the boxes have to sit on top of each other.
+			prev := g[len(g)-1].t
+			if luminance(r.t) > luminance(prev) {
+				prev.ColorR, prev.ColorG, prev.ColorB = r.t.ColorR, r.t.ColorG, r.t.ColorB
+			}
 			remove[r.i] = true
 			continue
 		}
@@ -113,6 +119,10 @@ func sameLine(a, b *TextObject) bool {
 	return math.Abs(baseline(a)-baseline(b)) <= math.Max(1.25, em*0.18)
 }
 
+func luminance(t *TextObject) int {
+	return int(t.ColorR) + int(t.ColorG) + int(t.ColorB)
+}
+
 func duplicateOverlap(prev, t *TextObject) bool {
 	if prev.Content == "" || prev.Content != t.Content {
 		return false
@@ -122,7 +132,7 @@ func duplicateOverlap(prev, t *TextObject) bool {
 		return false
 	}
 	shorter := math.Min(prev.Width, t.Width)
-	return shorter > 0 && -gap > shorter*0.55
+	return shorter > 0 && -gap > shorter*0.92
 }
 
 func contiguous(g []textRef, t *TextObject) bool {
@@ -136,10 +146,7 @@ func contiguous(g []textRef, t *TextObject) bool {
 		overlap := -gap
 		shorter := math.Min(prev.Width, t.Width)
 		if shorter > 0 && overlap > shorter*0.55 {
-			// A second copy of the same string is a duplicate (handled before
-			// this). Different text piled on the same spot is the next letter
-			// of a Canva word, whose boxes overlap by more than half.
-			return prev.Content != t.Content
+			return false
 		}
 	}
 	return gap <= em*0.85

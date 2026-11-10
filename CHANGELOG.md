@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0
+
+v1.3.9 cropped every picture against the current clip, including photos that only hang off the edge of the slide. That cut the Canva diamonds and, on the UAI keynote, deleted 13 pictures whose boxes missed the clip. A clip now crops a picture only when it removes more than about a third of the picture (the NeurIPS tweet card). A picture that misses the clip entirely stays.
+
+The Canva script wordmark is a letter outline filled by a tiling pattern that only paints an axial shading. That shading is now the fill, so the word is drawn.
+
+Canva paints a white letter on top of a black copy in the same box. v1.3.9 kept the black copy and also joined neighboring words, which turned the Mahidol captions black and dropped tokens on the Rotary deck. Only a copy that sits on the same box is removed, and the lighter color is the one kept. Text boxes are no longer widened, so columns do not collide.
+
+An Indexed color is looked up in its palette. A Separation tint is not painted as gray.
+
+`TestPictureCountBaseline` also checks unique Latin tokens against the v1.3.7 counts. `TestCanvaScriptWordmarkIsDrawn` and `TestUAIPicturesAreNotClippedAway` cover the two decks when the PDFs are on the machine.
+
 ## 1.3.9
 
 v1.3.8 composited every soft-masked picture into the image behind it and then deleted the picture. 24 decks lost logos and title art that way (the Mahidol Thai banner, the Railsware mark, the Beijing soft waves). That compositing is gone. A stored v1.3.7 baseline checks that `p:pic` counts do not fall; area may fall only where a clip crops overflow, and those decks are named in the baseline.

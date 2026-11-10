@@ -56,6 +56,7 @@ type gstate struct {
 	ctm                    matrix
 	fill, stroke           color3
 	fillN, strokeN         int
+	fillCS, strokeCS       string
 	lineWidth              float64
 	fillAlpha, strokeAlpha float64
 	fillGrad               *Gradient
@@ -432,6 +433,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		ip.gs.strokeN = 4
 	case "cs":
 		name := popName(st)
+		ip.gs.fillCS = name
 		ip.gs.fillN = ip.res.numComponents(name)
 		ip.gs.fillIsPat = name == "Pattern" || ip.res.isPatternSpace(name)
 		if ip.gs.fillIsPat {
@@ -440,6 +442,7 @@ func (ip *interp) exec(op string, st *[]token) {
 		}
 	case "CS":
 		name := popName(st)
+		ip.gs.strokeCS = name
 		ip.gs.strokeN = ip.res.numComponents(name)
 	case "sc":
 		ip.popColor(st, ip.gs.fillN, true)
@@ -449,6 +452,11 @@ func (ip *interp) exec(op string, st *[]token) {
 			ip.gs.fillGrad = nil
 			ip.gs.fillTile = nil
 			if g := ip.res.axialPattern(name, ip.baseCTM); g != nil {
+				ip.gs.fillGrad = g
+				ip.gs.fillIsPat = false
+			} else if g := ip.res.shadingInsideTile(name, ip.baseCTM); g != nil {
+				// Canva's script wordmark is a letter outline filled with a
+				// tiling pattern whose only paint is an axial shading.
 				ip.gs.fillGrad = g
 				ip.gs.fillIsPat = false
 			} else if t := ip.res.tilingPattern(name, ip.baseCTM); t != nil {
@@ -648,6 +656,93 @@ func (r *resources) numComponents(name string) int {
 	return 3
 }
 
+func (r *resources) indexedColor(name string, idx float64) (color3, bool) {
+	if r == nil || name == "" {
+		return color3{}, false
+	}
+	o := r.colorSpaceObj(name)
+	if o == nil {
+		if r.parent != nil {
+			return r.parent.indexedColor(name, idx)
+		}
+		return color3{}, false
+	}
+	o, err := r.xrd.Dereference(o)
+	if err != nil || o == nil {
+		return color3{}, false
+	}
+	arr, ok := o.(types.Array)
+	if !ok || len(arr) < 4 {
+		return color3{}, false
+	}
+	kind := ""
+	if nm, ok := arr[0].(types.Name); ok {
+		kind = nm.Value()
+	}
+	if kind != "Indexed" {
+		return color3{}, false
+	}
+	baseN := 3
+	if nm, ok := arr[1].(types.Name); ok {
+		_, baseN = csName(nm.Value())
+	}
+	if baseN != 1 && baseN != 3 {
+		baseN = 3
+	}
+	hival := 0
+	if n, ok := objNum(r.xrd, arr[2]); ok {
+		hival = int(n)
+	}
+	lut := lookupBytes(r.xrd, arr[3])
+	i := int(math.Round(idx))
+	if i < 0 {
+		i = 0
+	}
+	if hival > 0 && i > hival {
+		i = hival
+	}
+	off := i * baseN
+	if off < 0 || off+baseN > len(lut) {
+		return color3{}, false
+	}
+	if baseN == 1 {
+		v := float64(lut[off]) / 255
+		return color3{v, v, v}, true
+	}
+	return color3{float64(lut[off]) / 255, float64(lut[off+1]) / 255, float64(lut[off+2]) / 255}, true
+}
+
+func (r *resources) separationColor(name string, tint float64) (color3, bool) {
+	if r == nil || name == "" {
+		return color3{}, false
+	}
+	o := r.colorSpaceObj(name)
+	if o == nil {
+		if r.parent != nil {
+			return r.parent.separationColor(name, tint)
+		}
+		return color3{}, false
+	}
+	o, err := r.xrd.Dereference(o)
+	if err != nil || o == nil {
+		return color3{}, false
+	}
+	arr, ok := o.(types.Array)
+	if !ok || len(arr) < 2 {
+		return color3{}, false
+	}
+	kind := ""
+	if nm, ok := arr[0].(types.Name); ok {
+		kind = nm.Value()
+	}
+	if kind != "Separation" && kind != "DeviceN" {
+		return color3{}, false
+	}
+	// A spot tint is not a gray level. Without a tint transform we refuse
+	// the gray fallback; callers keep the previous color.
+	return color3{}, true
+}
+
 func (r *resources) isPatternSpace(name string) bool {
 	if name == "Pattern" || r == nil {
 		return name == "Pattern"
@@ -833,7 +928,19 @@ func (ip *interp) popColor(st *[]token, n int, fill bool) {
 	var c color3
 	switch n {
 	case 1:
-		c = color3{vals[0], vals[0], vals[0]}
+		cs := ip.gs.fillCS
+		if !fill {
+			cs = ip.gs.strokeCS
+		}
+		if looked, ok := ip.res.indexedColor(cs, vals[0]); ok {
+			c = looked
+		} else if _, spot := ip.res.separationColor(cs, vals[0]); spot {
+			// An index or a spot tint is not a gray level. Leaving it black
+			// beats painting navy body text as cyan.
+		} else {
+			// DeviceGray, CalGray, and a 1-channel ICC profile.
+			c = color3{vals[0], vals[0], vals[0]}
+		}
 	case 4:
 		c = cmyk(vals[0], vals[1], vals[2], vals[3])
 	default:
@@ -1658,11 +1765,21 @@ func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64) {
 	cy0 := math.Max(minY, imgMinY)
 	cx1 := math.Min(maxX, imgMaxX)
 	cy1 := math.Min(maxY, imgMaxY)
+	// A clip that misses the picture entirely used to delete it. That dropped
+	// 13 pictures from the UAI keynote. Keep the picture.
 	if cx1-cx0 < 0.5 || cy1-cy0 < 0.5 {
-		ip.elements = ip.elements[:len(ip.elements)-1]
 		return
 	}
-	if cx0-imgMinX < 1.5 && imgMaxX-cx1 < 1.5 && cy0-imgMinY < 1.5 && imgMaxY-cy1 < 1.5 {
+	area := img.Width * img.Height
+	inter := (cx1 - cx0) * (cy1 - cy0)
+	if area < 1 {
+		return
+	}
+	outside := 1 - inter/area
+	// A clip that only shaves the edge (Canva diamonds, a photo that hangs
+	// off the slide) must not crop. A real window, like the NeurIPS tweet
+	// card, removes more than a third of the picture.
+	if outside < 0.36 {
 		return
 	}
 	// Only axis-aligned placements can be cropped by a rectangle.
@@ -1683,6 +1800,47 @@ func (ip *interp) clipLastImage(minX, minY, maxX, maxY float64) {
 	img.Y = (ip.originY + ip.pageH) - cy1
 	img.Width = cx1 - cx0
 	img.Height = cy1 - cy0
+}
+
+// shadingInsideTile resolves a tiling pattern that only paints one shading
+// pattern. Canva fills each script letter this way.
+func (r *resources) shadingInsideTile(name string, ctm matrix) *Gradient {
+	d, sd := r.patternDict(name)
+	if d == nil || sd == nil || intEntry(r.xrd, d, "PatternType") != 1 {
+		return nil
+	}
+	if err := sd.Decode(); err != nil || len(sd.Content) == 0 {
+		return nil
+	}
+	inner := lastPatternName(sd.Content)
+	if inner == "" {
+		return nil
+	}
+	res := r
+	if o, ok := sd.Find("Resources"); ok {
+		if rd, err := r.xrd.DereferenceDict(o); err == nil && rd != nil {
+			res = newResources(r.xrd, rd, r)
+		}
+	}
+	if g := res.axialPattern(inner, ctm); g != nil {
+		return g
+	}
+	return res.shadingInsideTile(inner, ctm)
+}
+
+func lastPatternName(content []byte) string {
+	toks := tokenize(content)
+	name := ""
+	for _, t := range toks {
+		if t.kind == tkName {
+			name = t.text
+			continue
+		}
+		if t.kind == tkOp && (t.text == "scn" || t.text == "SCN") && name != "" && name != "Pattern" {
+			return name
+		}
+	}
+	return ""
 }
 
 func (r *resources) axialPattern(name string, ctm matrix) *Gradient {

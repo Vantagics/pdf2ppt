@@ -22,6 +22,7 @@ type pictureBaseline struct {
 		Pics      int     `json:"pics"`
 		Area      int64   `json:"area"`
 		AreaSlack float64 `json:"areaSlack"`
+		Tokens    int     `json:"tokens"`
 	} `json:"decks"`
 }
 
@@ -57,6 +58,13 @@ func TestPictureCountBaseline(t *testing.T) {
 			if want.Area > 0 && float64(area) < float64(want.Area)*(1-slack) {
 				t.Fatalf("picture area %d is below the v1.3.7 baseline %d (slack %.0f%%)", area, want.Area, slack*100)
 			}
+			if want.Tokens > 0 {
+				got := pptxTokens(t, out)
+				// One percent: a fix must not trade away another deck's text.
+				if float64(got) < float64(want.Tokens)*0.99 {
+					t.Fatalf("unique latin tokens %d, v1.3.7 baseline %d", got, want.Tokens)
+				}
+			}
 		})
 	}
 	if found == 0 {
@@ -84,6 +92,39 @@ var (
 	picRe = regexp.MustCompile(`(?s)<p:pic>.*?</p:pic>`)
 	extRe = regexp.MustCompile(`<a:ext cx="(\d+)" cy="(\d+)"`)
 )
+
+func pptxTokens(t *testing.T, path string) int {
+	t.Helper()
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer z.Close()
+	seen := map[string]bool{}
+	word := regexp.MustCompile(`[A-Za-z0-9']{2,}`)
+	for _, f := range z.File {
+		name := f.Name
+		if !strings.HasPrefix(name, "ppt/slides/slide") || !strings.HasSuffix(name, ".xml") || strings.Contains(name, "/_rels/") {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range regexp.MustCompile(`<a:t>([^<]*)</a:t>`).FindAllStringSubmatch(string(b), -1) {
+			s := strings.NewReplacer("&amp;", "&", "&lt;", "<", "&gt;", ">").Replace(m[1])
+			for _, w := range word.FindAllString(s, -1) {
+				seen[strings.ToLower(w)] = true
+			}
+		}
+	}
+	return len(seen)
+}
 
 func pptxPictures(t *testing.T, path string) (int, int64) {
 	t.Helper()

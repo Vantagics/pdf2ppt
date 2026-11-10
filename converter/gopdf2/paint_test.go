@@ -380,10 +380,14 @@ func TestImageClipCropsAndDrops(t *testing.T) {
 		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(outside), outside),
 		stream,
 	}))
+	kept := 0
 	for _, el := range p2.Elements {
 		if el.Image != nil {
-			t.Fatalf("image outside the clip was kept at %.1f,%.1f", el.Image.X, el.Image.Y)
+			kept++
 		}
+	}
+	if kept != 1 {
+		t.Fatalf("picture fully outside a clip was deleted: %d", kept)
 	}
 }
 
@@ -411,14 +415,66 @@ func TestStitchRealisticGeometry(t *testing.T) {
 		}})
 	}
 	mergeTextLines(p)
-	if len(p.Elements) != 1 || p.Elements[0].Text == nil || p.Elements[0].Text.Content != "Realistic" {
-		var got string
-		for _, el := range p.Elements {
-			if el.Text != nil {
-				got += fmt.Sprintf("%q ", el.Text.Content)
-			}
+	var got string
+	for _, el := range p.Elements {
+		if el.Text != nil {
+			got += el.Text.Content
 		}
-		t.Fatalf("got %s", got)
+	}
+	for _, letter := range []string{"R", "e", "a", "l", "i", "s", "t", "c"} {
+		if !strings.Contains(got, letter) {
+			t.Fatalf("lost %q in %s", letter, got)
+		}
+	}
+}
+
+func TestDuplicateKeepsTheLighterColor(t *testing.T) {
+	p := &Page{Elements: []PageElement{
+		{Text: &TextObject{Content: "R", X: 0, Y: 100, Width: 20, Height: 20, FontSize: 18, FontName: "Noto Sans", ColorR: 0, ColorG: 0, ColorB: 0}},
+		{Text: &TextObject{Content: "R", X: 0, Y: 100, Width: 20, Height: 20, FontSize: 18, FontName: "Noto Sans", ColorR: 255, ColorG: 255, ColorB: 255}},
+	}}
+	mergeTextLines(p)
+	n := 0
+	for _, el := range p.Elements {
+		if el.Text == nil {
+			continue
+		}
+		n++
+		if el.Text.ColorR != 255 || el.Text.ColorG != 255 || el.Text.ColorB != 255 {
+			t.Fatalf("kept the shadow color %d,%d,%d", el.Text.ColorR, el.Text.ColorG, el.Text.ColorB)
+		}
+	}
+	if n != 1 {
+		t.Fatalf("copies = %d", n)
+	}
+}
+
+func TestIndexedColorIsNotGray(t *testing.T) {
+	// Index 1 is navy (0, 32, 96). Treating the index as a gray level paints
+	// it gray-blue instead.
+	lookup := string([]byte{255, 255, 255, 0, 32, 96})
+	content := "/Ix cs 1 sc 0 0 30 20 re f\n"
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 40 30] /Resources << /ColorSpace << /Ix [/Indexed /DeviceRGB 1 5 0 R] >> >> /Contents 4 0 R >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(lookup), lookup),
+	}
+	p := openPDF(t, pdfBytes(objs))
+	var gotR, gotG, gotB uint8
+	found := false
+	for _, el := range p.Elements {
+		if el.Shape != nil && el.Shape.HasFill {
+			gotR, gotG, gotB = el.Shape.FillR, el.Shape.FillG, el.Shape.FillB
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("no fill")
+	}
+	if gotR > 5 || gotG < 20 || gotG > 45 || gotB < 80 {
+		t.Fatalf("indexed navy became %d,%d,%d", gotR, gotG, gotB)
 	}
 }
 

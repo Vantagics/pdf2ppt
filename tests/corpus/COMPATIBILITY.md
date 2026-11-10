@@ -1,5 +1,11 @@
 # Compatibility notes
 
+## v1.4.0
+
+Edge clips no longer crop page-sized photos, so the Canva diamond fields keep the v1.3.7 placement. The script “Canva” wordmark is the axial shading behind each letter outline. The UAI keynote is back to 253 pictures. Mahidol captions stay white: a same-position duplicate keeps the lighter color. Indexed palette entries are not treated as gray.
+
+The NeurIPS page 19 tweet stays cropped, because that clip removes more than a third of the JPEG.
+
 ## v1.3.9
 
 Soft-masked pictures are no longer folded into the background. Picture counts match v1.3.7 on the local corpus (Mahidol slide 1 is 4 pictures, SaaSOpen slide 1 is 5, Tencent slide 1 is 2). Rectangular clips crop images, which is why NeurIPS page 19 no longer shows the tweet above the Manhattan render and why the page 8 icon stops before the "8".

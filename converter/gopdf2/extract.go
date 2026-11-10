@@ -74,7 +74,6 @@ func (d *Document) extractPage(pageNr int) (*Page, error) {
 		applyRotation(page, inh.Rotate)
 	}
 	mergeTextLines(page)
-	opacifyLightMasks(page)
 	page.syncLists()
 	return page, nil
 }

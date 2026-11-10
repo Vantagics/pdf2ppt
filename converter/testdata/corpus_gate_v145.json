@@ -1,6 +1,6 @@
 {
   "source": "v1.4.5",
-  "note": "Picture count, picture area, unique Latin tokens, concatenated a:t tokens, and v1.4.0 PPTX bytes for every manifest deck whose URL still returns a PDF. tsmc-2q25-zh, korea-privacy, and nrcs-cattle-distiller are known-blocked and omitted. Renders are LibreOffice page images.",
+  "note": "Picture count, picture area, unique Latin tokens, concatenated a:t tokens, and a size ceiling for every manifest deck whose URL still returns a PDF. tsmc-2q25-zh is blocked; its correct concatenated token count is 261 (the footer is © 2025 TSMC, Ltd). korea-privacy and nrcs-cattle-distiller are also blocked. Decks added in v1.5.0 use that release's PPTX size as the ceiling. Renders are LibreOffice page images.",
   "decks": {
     "aist-ohno": {
       "pics": 51,
@@ -265,6 +265,54 @@
       "tokens": 9,
       "concatTokens": 7,
       "sizeV140": 36657
+    },
+    "jp-tategaki": {
+      "pics": 0,
+      "area": 0,
+      "areaSlack": 0.02,
+      "tokens": 0,
+      "concatTokens": 0,
+      "sizeV140": 8436
+    },
+    "he-openu-a11y": {
+      "pics": 70,
+      "area": 418173970030497,
+      "areaSlack": 0.02,
+      "tokens": 31,
+      "concatTokens": 31,
+      "sizeV140": 1201945
+    },
+    "who-tb2023": {
+      "pics": 120,
+      "area": 1386783093474243,
+      "areaSlack": 0.02,
+      "tokens": 818,
+      "concatTokens": 990,
+      "sizeV140": 3516538
+    },
+    "arcourts-ppt": {
+      "pics": 15,
+      "area": 112177585879089,
+      "areaSlack": 0.02,
+      "tokens": 311,
+      "concatTokens": 333,
+      "sizeV140": 383909
+    },
+    "wps-office2019": {
+      "pics": 136,
+      "area": 1766396582574429,
+      "areaSlack": 0.02,
+      "tokens": 110,
+      "concatTokens": 200,
+      "sizeV140": 33551535
+    },
+    "oicw-1996-scan": {
+      "pics": 74,
+      "area": 5602612152401248,
+      "areaSlack": 0.02,
+      "tokens": 0,
+      "concatTokens": 0,
+      "sizeV140": 34042272
     }
   },
   "renders": [
@@ -447,6 +495,36 @@
       "name": "wps-tutorial-p4",
       "id": "wps-tutorial",
       "page": 4
+    },
+    {
+      "name": "jp-tategaki-p1",
+      "id": "jp-tategaki",
+      "page": 1
+    },
+    {
+      "name": "he-openu-a11y-p1",
+      "id": "he-openu-a11y",
+      "page": 1
+    },
+    {
+      "name": "who-tb2023-p1",
+      "id": "who-tb2023",
+      "page": 1
+    },
+    {
+      "name": "arcourts-ppt-p1",
+      "id": "arcourts-ppt",
+      "page": 1
+    },
+    {
+      "name": "wps-office2019-p1",
+      "id": "wps-office2019",
+      "page": 1
+    },
+    {
+      "name": "oicw-1996-scan-p1",
+      "id": "oicw-1996-scan",
+      "page": 1
     }
   ]
 }

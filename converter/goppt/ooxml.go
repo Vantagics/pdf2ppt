@@ -182,7 +182,11 @@ func formatTextBox(tb *TextBox, id int) string {
 	sb.WriteString(`<a:lstStyle/>`)
 	// 100% line spacing keeps the first baseline on the font's em box. The
 	// default (omitted) spacing adds external leading and drops the glyphs.
-	sb.WriteString(`<a:p><a:pPr marL="0" indent="0"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:buNone/></a:pPr>`)
+	rtl := ""
+	if tb.RTL {
+		rtl = ` rtl="1"`
+	}
+	sb.WriteString(fmt.Sprintf(`<a:p><a:pPr%s marL="0" indent="0"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc><a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:buNone/></a:pPr>`, rtl))
 	for _, run := range textRuns(tb) {
 		sb.WriteString(formatTextRun(tb, run))
 	}

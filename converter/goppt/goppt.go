@@ -53,6 +53,7 @@ type TextBox struct {
 	Tracking    float64 // extra points between glyphs; negative tightens
 	Clip        bool
 	NoFill      bool
+	RTL         bool
 	Runs        []TextRun
 }
 

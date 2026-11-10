@@ -1595,8 +1595,14 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		xLeft = cx - width/2
 		yTop = cy - height/2
 	}
+	rtl := false
+	if hasRTLScript(text) {
+		text = visualLTRToLogical(text)
+		rtl = true
+	}
 	tb := &TextObject{
 		Content:     text,
+		RTL:         rtl,
 		FontName:    family,
 		FontSize:    eff,
 		Bold:        bold,

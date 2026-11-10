@@ -1,5 +1,5 @@
 {
-  "source": "v1.4.9",
+  "source": "v1.5.0",
   "note": "Unique-token recall of concatenated a:t against pdftotext. A later build fails if a deck drops more than 0.3 percentage points.",
   "recall": {
     "aist-ohno": 0.9802955665024631,
@@ -13,6 +13,12 @@
     "cdc-nbs-m365": 0.8352803738317757,
     "cesar2025-ai": 0.8880994671403197,
     "ecss24-harman": 0.7407407407407407,
+    "arcourts-ppt": 0.919872,
+    "he-openu-a11y": 0.921444,
+    "jp-tategaki": 1,
+    "oicw-1996-scan": 1,
+    "who-tb2023": 0.844933,
+    "wps-office2019": 0.996012,
     "gzmtu-ppt-2013": 0.9980806142034548,
     "kaist-xai": 1,
     "kust-pressure": 0.9753086419753086,

@@ -41,7 +41,7 @@ go run ./cmd/pdf2ppt input.pdf output.pptx
 ```
 
 ```text
-pdf2ppt 1.4.9
+pdf2ppt 1.5.0
 usage: pdf2ppt input.pdf output.pptx
 ```
 

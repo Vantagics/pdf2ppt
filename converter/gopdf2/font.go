@@ -1,10 +1,13 @@
 package gopdf2
 
 import (
+	_ "embed"
 	"encoding/hex"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf16"
 
@@ -12,6 +15,40 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"golang.org/x/text/encoding/charmap"
 )
+
+//go:embed cmap/Adobe-Japan1
+var japan1Text string
+
+var (
+	japan1Once sync.Once
+	japan1Tab  []rune
+)
+
+func japan1Rune(cid uint64) string {
+	japan1Once.Do(func() {
+		lines := strings.Split(japan1Text, "\n")
+		japan1Tab = make([]rune, len(lines))
+		for i, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			n, err := strconv.ParseUint(line, 16, 32)
+			if err != nil || n == 0 {
+				continue
+			}
+			japan1Tab[i] = rune(n)
+		}
+	})
+	if cid >= uint64(len(japan1Tab)) {
+		return ""
+	}
+	r := japan1Tab[cid]
+	if r == 0 {
+		return ""
+	}
+	return string(r)
+}
 
 var subsetPrefix = regexp.MustCompile(`^[A-Z]{6}\+`)
 
@@ -69,6 +106,8 @@ type pdfFont struct {
 	// symbolic is the PDF font flag. A subset icon font (the Keynote lock)
 	// sets it; body text does not.
 	symbolic bool
+	// japan1 means an Adobe-Japan1 CID font with no usable ToUnicode entry.
+	japan1 bool
 	// program is the embedded FontFile2 (TrueType) or FontFile3 (CFF/OpenType).
 	program []byte
 	t3      *type3Font
@@ -208,6 +247,11 @@ func glyphToUnicode(name string) string {
 func (f *pdfFont) unicode(code uint64, first byte) string {
 	if f != nil && f.toUni != nil {
 		if s := f.toUni[code]; s != "" {
+			return s
+		}
+	}
+	if f != nil && f.japan1 {
+		if s := japan1Rune(code); s != "" {
 			return s
 		}
 	}
@@ -364,6 +408,9 @@ func parseFont(xrd *model.XRefTable, obj types.Object) *pdfFont {
 	if dfs := d.ArrayEntry("DescendantFonts"); len(dfs) > 0 {
 		dd, err := xrd.DereferenceDict(dfs[0])
 		if err == nil && dd != nil {
+			if cidOrdering(xrd, dd) == "Japan1" {
+				f.japan1 = true
+			}
 			applyCIDWidths(xrd, dd, f)
 			applyDescriptor(xrd, dd, f)
 			if dw := numEntry(xrd, dd, "DW"); dw > 0 {
@@ -378,6 +425,31 @@ func parseFont(xrd *model.XRefTable, obj types.Object) *pdfFont {
 		f.t3 = readType3(xrd, d)
 	}
 	return f
+}
+
+func cidOrdering(xrd *model.XRefTable, d types.Dict) string {
+	o, ok := d.Find("CIDSystemInfo")
+	if !ok {
+		return ""
+	}
+	info, err := xrd.DereferenceDict(o)
+	if err != nil || info == nil {
+		return ""
+	}
+	obj, ok := info.Find("Ordering")
+	if !ok {
+		return ""
+	}
+	obj, err = xrd.Dereference(obj)
+	if err != nil || obj == nil {
+		return ""
+	}
+	switch s := obj.(type) {
+	case types.StringLiteral:
+		return string(s)
+	default:
+		return ""
+	}
 }
 
 func applyDescriptor(xrd *model.XRefTable, d types.Dict, f *pdfFont) {

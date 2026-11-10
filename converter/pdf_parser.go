@@ -131,6 +131,7 @@ func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 		Tracking:    textObj.Tracking,
 		Clip:        textObj.Clip,
 		NoFill:      textObj.NoFill,
+		RTL:         textObj.RTL,
 	}
 	for _, r := range textObj.Runs {
 		elem.Runs = append(elem.Runs, TextRun{

@@ -205,6 +205,72 @@ func TestLetterUnderAWordIsNotASubscript(t *testing.T) {
 	}
 }
 
+func TestVisualLTRToLogical(t *testing.T) {
+	// Left-to-right visual order of "מעל ל 50 אחוז".
+	visual := "זוחא 50 ל לעמ"
+	got := visualLTRToLogical(visual)
+	if got != "מעל ל 50 אחוז" {
+		t.Fatalf("logical %q", got)
+	}
+	if visualLTRToLogical("Hello") != "Hello" {
+		t.Fatal("latin moved")
+	}
+}
+
+func TestVerticalPDFOpens(t *testing.T) {
+	pdf := corpusFile("jp-tategaki")
+	if pdf == "" {
+		t.Skip("vertical sample not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.PageCount() < 1 {
+		t.Fatal("no pages")
+	}
+	p, err := doc.GetPage(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, tb := range p.TextObjects {
+		b.WriteString(tb.Content)
+	}
+	if !strings.Contains(b.String(), "あいうえお") {
+		t.Fatalf("vertical text missing: %q", b.String())
+	}
+}
+
+func TestHebrewReadingOrder(t *testing.T) {
+	pdf := corpusFile("he-openu-a11y")
+	if pdf == "" {
+		t.Skip("hebrew deck not present")
+	}
+	doc, err := Open(pdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := doc.GetPage(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	rtl := false
+	for _, tb := range p.TextObjects {
+		b.WriteString(tb.Content)
+		if tb.RTL {
+			rtl = true
+		}
+	}
+	if !strings.Contains(b.String(), "בדיקות") || strings.Contains(b.String(), "תוקידב") {
+		t.Fatalf("hebrew still reversed: %q", b.String())
+	}
+	if !rtl {
+		t.Fatal("hebrew box was not marked rtl")
+	}
+}
+
 func TestEquationLetterSubscriptStays(t *testing.T) {
 	// B_s on the beamer table. The s is a few points tall, unlike a Canva title letter.
 	body := &TextObject{Content: "10B", FontName: "Tinos", FontSize: 11.2, X: 27.8, Y: 100, Width: 28, Height: 13}

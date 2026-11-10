@@ -29,8 +29,8 @@ type pictureBaseline struct {
 // requiredCorpusDecks is every manifest PDF except the generated chrome-skia
 // fixture and the known-blocked URLs: tsmc (Cloudflare 403), korea-privacy
 // (expired attachment link), and nrcs-cattle-distiller (the host accepts TLS
-// and then sends no bytes).
-const requiredCorpusDecks = 33
+// and then sends no bytes). v1.5.0 adds six more fetchable decks.
+const requiredCorpusDecks = 39
 
 type corpusGate struct {
 	Source string `json:"source"`

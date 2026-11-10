@@ -12,6 +12,7 @@ import (
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/validate"
 )
 
 // Document is an opened PDF.
@@ -70,6 +71,8 @@ type TextObject struct {
 	// NoFill keeps the characters in the file for recall but does not paint
 	// them. A Type3 outline is the visible glyph.
 	NoFill bool
+	// RTL is set when the text is Hebrew or Arabic in logical order.
+	RTL bool
 	// symbolProg is the embedded font for a one-character symbolic run.
 	// replaceIsolatedSymbols draws it when the run stays isolated.
 	symbolProg []byte
@@ -166,12 +169,20 @@ func Open(filePath string) (*Document, error) {
 		return nil, errors.New("文件不是有效的 PDF 格式")
 	}
 
-	ctx, err := api.ReadContextFile(filePath)
+	if _, err := f.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("无法读取文件: %w", err)
+	}
+	ctx, err := api.ReadContext(f, model.NewDefaultConfiguration())
 	if err != nil {
 		msg := err.Error()
 		if strings.Contains(msg, "no such file") || strings.Contains(msg, "permission") {
 			return nil, fmt.Errorf("无法读取文件: %w", err)
 		}
+		return nil, fmt.Errorf("文件不是有效的 PDF 格式: %w", err)
+	}
+	// Some TeX files name a destination with an indirect object where a name
+	// is required. That does not affect the page content, so keep the file.
+	if err := validate.XRefTable(ctx); err != nil && !strings.Contains(err.Error(), "validateDestinationArray") {
 		return nil, fmt.Errorf("文件不是有效的 PDF 格式: %w", err)
 	}
 

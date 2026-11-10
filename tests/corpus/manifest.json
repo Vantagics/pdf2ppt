@@ -189,6 +189,8 @@
       "blocked": "Cloudflare 403 challenge",
       "url": "https://investor.tsmc.com/chinese/encrypt/files/encrypt_file/qr/phase4_reports/2025-07/9483d527d1ddeba9f895fade353628cf2938fb8d/2Q25%20Presentation%20%28C%29%20WoG.pdf",
       "pages": 10,
+      "concatTokens": 261,
+      "concatNote": "The footer is © 2025 TSMC, Ltd. v1.4.2 through v1.4.6 dropped that space, so the concatenated count was 262. 261 is the correct count.",
       "license": "Company earnings slides. No redistribution license was stated, so the PDF is not committed.",
       "commit": false
     },
@@ -326,6 +328,60 @@
       "url": "https://res1.wpsacdm.cache.wpscdn.cn/files/da89cfdf6a11419aeb478b86ff0c84bf.pdf",
       "pages": 2,
       "license": "WPS sample. No redistribution license was stated, so the PDF is not committed.",
+      "commit": false
+    },
+    {
+      "id": "jp-tategaki",
+      "producer": "dvipdfmx (LaTeX). Font is Identity-V, Adobe-Japan1, with no ToUnicode map.",
+      "kind": "vertical Japanese text sample (tategaki / Identity-V)",
+      "url": "https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/vertical.pdf",
+      "pages": 3,
+      "license": "pdf.js test corpus. Not committed; fetched by the script.",
+      "commit": false
+    },
+    {
+      "id": "he-openu-a11y",
+      "producer": "Microsoft PowerPoint 2010",
+      "kind": "Hebrew accessibility-testing slides with ToUnicode",
+      "url": "https://www.openu.ac.il/lists/mediaserver_documents/%D7%90%D7%99%D7%9C%D7%A0%D7%94%20%D7%91%D7%A0%D7%99%D7%A9%20-%20%D7%91%D7%93%D7%99%D7%A7%D7%95%D7%AA%20%D7%A0%D7%92%D7%99%D7%A9%D7%95%D7%AA.pdf",
+      "pages": 16,
+      "license": "Open University of Israel teaching slides. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "who-tb2023",
+      "producer": "Microsoft PowerPoint for Microsoft 365",
+      "kind": "WHO Global Tuberculosis Report 2023 slide set, chart-heavy",
+      "url": "https://cdn.who.int/media/docs/default-source/hq-tuberculosis/global-tuberculosis-report-2023/globaltbreport2023_slideset.pdf",
+      "pages": 69,
+      "license": "WHO publication. Not committed; fetched by the script.",
+      "commit": false
+    },
+    {
+      "id": "arcourts-ppt",
+      "producer": "Foxit PDF Editor Printer, printed from a PowerPoint design session",
+      "kind": "widescreen PowerPoint handout with soft-mask transparency",
+      "url": "https://arcourts.gov/sites/default/files/ACAP%20Conference%202025/handouts/2025ACAP%20-%20Getting-Started-with-Microsoft-PowerPoint.pdf",
+      "pages": 8,
+      "license": "Arkansas courts conference handout. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "wps-office2019",
+      "producer": "WPS 文字",
+      "kind": "WPS Office 2019 guide, 102 pages, including the WPS presentation chapter",
+      "url": "https://it.nwpu.edu.cn/down/WPS/WPSOffice2019gaoxiaobangong.pdf",
+      "pages": 102,
+      "license": "Northwestern Polytechnical University IT download. Not committed.",
+      "commit": false
+    },
+    {
+      "id": "oicw-1996-scan",
+      "producer": "Adobe Acrobat Image Conversion Plug-in",
+      "kind": "image-only scan of a 1996 PowerPoint briefing, 74 pages, no fonts",
+      "url": "https://archive.org/download/R00404OICWOverviewPowerpointPresentation5January1996HKATK.EnglishLanguage/R00404%20%5BOICW%20overview-%20Powerpoint%20presentation%205%20January%201996%2C%20HK%2C%20ATK.%20English%20language%5D.pdf",
+      "pages": 74,
+      "license": "Internet Archive public upload of a historical briefing. Not committed.",
       "commit": false
     },
     {

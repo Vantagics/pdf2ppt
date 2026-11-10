@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+Six public PDFs join the corpus, and two holes they hit are closed.
+
+A vertical Japanese file (Identity-V, Adobe-Japan1, no ToUnicode) was rejected because a destination array uses an indirect name. That destination no longer fails the open, and Adobe-Japan1 CIDs map to Unicode, so the sample reads あいうえお and 日本語.
+
+Hebrew from the Open University slides was stored in left-to-right visual order, so an LTR box showed it backwards. Those runs are rewritten into logical order and the paragraph is `rtl="1"`. Slide 1 reads בדיקות נגישות באינטרנט.
+
+`tsmc-2q25-zh` stays blocked by Cloudflare. Its concatenated token count of 261 is the correct one: the footer is `© 2025 TSMC, Ltd`. v1.4.2 through v1.4.6 dropped that space.
+
 ## 1.4.9
 
 KUST page 4 still read `ρg (z₁ − z₂)`, a little open, and the split left `ρg` at the end of its box so it glued to the next word (`ρg②`, which is `ρg2` after NFKC). The parenthesis now starts where the Times ink of `ρg` ends, and that box keeps a trailing space so the token stays `ρg`. The boxes still do not overlap.

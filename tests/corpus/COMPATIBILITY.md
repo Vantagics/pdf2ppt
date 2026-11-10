@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.0
+
+Six decks are fetched with the rest of the corpus: `jp-tategaki` (vertical Japanese, Identity-V), `he-openu-a11y` (Hebrew PowerPoint, ToUnicode), `who-tb2023` (chart slides), `arcourts-ppt` (widescreen handout with soft masks), `wps-office2019` (102-page WPS guide), `oicw-1996-scan` (74-page image-only scan). The gate count is 39. `tsmc-2q25-zh` concatenated tokens are 261; that is the footer `© 2025 TSMC, Ltd`, not a missing token.
+
 ## v1.4.9
 
 KUST page 4 draws `ρg(z₁ − z₂)` with the parenthesis against the ink of `g`, and a trailing space so `ρg` does not glue to the next word. NeurIPS subscripts on pages 41, 42, and 45 stay inline, without the hole space. `tsmc-2q25-zh` was not remeasured (Cloudflare 403, no Wayback copy).

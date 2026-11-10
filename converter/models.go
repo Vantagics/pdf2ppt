@@ -45,6 +45,7 @@ type TextElement struct {
 	Tracking    float64   `json:"tracking,omitempty"`
 	Clip        bool      `json:"clip,omitempty"`
 	NoFill      bool      `json:"noFill,omitempty"`
+	RTL         bool      `json:"rtl,omitempty"`
 	Runs        []TextRun `json:"runs,omitempty"`
 }
 

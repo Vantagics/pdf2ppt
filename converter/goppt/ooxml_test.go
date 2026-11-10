@@ -38,6 +38,13 @@ func TestTextOutline(t *testing.T) {
 	}
 }
 
+func TestRTLParagraph(t *testing.T) {
+	xml := formatTextBox(&TextBox{Content: "שלום", FontName: "Arial", FontSize: 18, Width: 200, Height: 40, RTL: true}, 5)
+	if !strings.Contains(xml, `<a:pPr rtl="1"`) {
+		t.Fatalf("rtl paragraph missing: %s", xml)
+	}
+}
+
 func TestSubscriptBaseline(t *testing.T) {
 	xml := formatTextRun(&TextBox{}, TextRun{
 		Content: "2", FontName: "Tinos", FontSize: 17, Baseline: -25000,

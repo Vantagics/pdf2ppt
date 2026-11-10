@@ -222,6 +222,12 @@ func buildMerged(ts []*TextObject) *TextObject {
 		ColorG:   runs[0].ColorG,
 		ColorB:   runs[0].ColorB,
 	}
+	for _, t := range cp {
+		if t.RTL {
+			out.RTL = true
+			break
+		}
+	}
 	allHidden := true
 	for _, t := range cp {
 		if !t.NoFill {

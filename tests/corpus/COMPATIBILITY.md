@@ -1,5 +1,11 @@
 # Compatibility notes
 
+## v1.3.7
+
+Caption word spaces around 0.2 em are kept (`Getty images`, `Amadeu Pons`). Indexed images use their palette, so the Tencent wordmark stays white. The mine-safety “四” badge is the blue shading from its sampled function. A widely spaced `()` in the KUST formula is split into the two parentheses.
+
+Not in this pass: Keynote Type 1C icons with no ToUnicode (the lock is still `$`, because the same font’s other characters are real MacRoman text). The Canva script wordmark is not a text run. LibreOffice ADMIN/TUXEDO marks and Keynote dotted arrows are unchanged.
+
 ## v1.3.6, checked in Microsoft PowerPoint
 
 Fifteen more decks are listed in `manifest.json` (Google Slides, Canva, WPS, Keynote, LibreOffice, PDFMaker, and several PowerPoint years). They are not committed. A 25-deck pass opened every PPTX in PowerPoint 16 with no repair dialog and the dominant page size.

@@ -29,6 +29,14 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 		bpc = 8
 	}
 	csName, ncomp := colorInfo(xrd, sd.Dict)
+	var indexed []byte
+	var indexedN int
+	if csName == "indexed" {
+		indexedN, indexed = readIndexed(xrd, sd.Dict)
+		if indexedN > 0 {
+			ncomp = 1
+		}
+	}
 
 	// Decode the stream. DCTDecode stays as JPEG bytes unless CMYK.
 	if err := sd.Decode(); err != nil {
@@ -55,7 +63,7 @@ func encodePlacedImage(xrd *model.XRefTable, sd *types.StreamDict, opacity float
 			return nil, "", err
 		}
 	} else {
-		img = samplesToImage(width, height, bpc, csName, ncomp, raw, decode)
+		img = samplesToImage(width, height, bpc, csName, ncomp, raw, decode, indexed, indexedN)
 		if img == nil {
 			return nil, "", nil
 		}
@@ -393,7 +401,88 @@ func maskAlpha(samples []byte, w, h int, dec []float64, x, y, dstW, dstH int) by
 	return byte(math.Round(norm * 255))
 }
 
-func samplesToImage(width, height, bpc int, cs string, ncomp int, raw []byte, dec []float64) image.Image {
+// readIndexed returns the base component count and the lookup table for an
+// Indexed color space. Tencent's white wordmark is an indexed image whose
+// opaque pixels are index 0 (white); ignoring the table paints them black.
+func readIndexed(xrd *model.XRefTable, d types.Dict) (ncomp int, lut []byte) {
+	o, ok := d.Find("ColorSpace")
+	if !ok || o == nil {
+		return 0, nil
+	}
+	o, err := xrd.Dereference(o)
+	if err != nil {
+		return 0, nil
+	}
+	arr, ok := o.(types.Array)
+	if !ok || len(arr) < 4 {
+		return 0, nil
+	}
+	kind := ""
+	if nm, ok := arr[0].(types.Name); ok {
+		kind = nm.Value()
+	}
+	if kind != "Indexed" {
+		return 0, nil
+	}
+	ncomp = 3
+	if nm, ok := arr[1].(types.Name); ok {
+		_, ncomp = csName(nm.Value())
+	} else if sd, _, err := xrd.DereferenceStreamDict(arr[1]); err == nil && sd != nil {
+		if n := intEntry(xrd, sd.Dict, "N"); n == 1 || n == 3 || n == 4 {
+			ncomp = n
+		}
+	}
+	hival := 0
+	if n, ok := objNum(xrd, arr[2]); ok {
+		hival = int(n)
+	}
+	lut = lookupBytes(xrd, arr[3])
+	need := (hival + 1) * ncomp
+	if ncomp < 1 || len(lut) < need || need < ncomp {
+		return 0, nil
+	}
+	return ncomp, lut[:need]
+}
+
+func lookupBytes(xrd *model.XRefTable, o types.Object) []byte {
+	if o == nil {
+		return nil
+	}
+	o, err := xrd.Dereference(o)
+	if err != nil || o == nil {
+		return nil
+	}
+	switch v := o.(type) {
+	case types.StringLiteral:
+		b, err := types.Unescape(v.Value())
+		if err != nil {
+			return []byte(v.Value())
+		}
+		return b
+	case types.HexLiteral:
+		b, err := v.Bytes()
+		if err != nil {
+			return nil
+		}
+		return b
+	case types.StreamDict:
+		sd := v
+		if err := sd.Decode(); err != nil {
+			return nil
+		}
+		return sd.Content
+	default:
+		if sd, _, err := xrd.DereferenceStreamDict(o); err == nil && sd != nil {
+			if err := sd.Decode(); err != nil {
+				return nil
+			}
+			return sd.Content
+		}
+		return nil
+	}
+}
+
+func samplesToImage(width, height, bpc int, cs string, ncomp int, raw []byte, dec []float64, indexed []byte, indexedN int) image.Image {
 	if bpc != 8 || width <= 0 || height <= 0 || ncomp <= 0 {
 		return nil
 	}
@@ -408,6 +497,21 @@ func samplesToImage(width, height, bpc int, cs string, ncomp int, raw []byte, de
 			pix := row[x*ncomp : (x+1)*ncomp]
 			r, g, b := byte(0), byte(0), byte(0)
 			switch cs {
+			case "indexed":
+				if indexedN < 1 || len(indexed) < indexedN {
+					continue
+				}
+				idx := int(pix[0])
+				off := idx * indexedN
+				if off < 0 || off+indexedN > len(indexed) {
+					continue
+				}
+				if indexedN == 1 {
+					v := indexed[off]
+					r, g, b = v, v, v
+				} else if indexedN >= 3 {
+					r, g, b = indexed[off], indexed[off+1], indexed[off+2]
+				}
 			case "gray":
 				v := applyDec(pix[0], dec, 0)
 				r, g, b = v, v, v

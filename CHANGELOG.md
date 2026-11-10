@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.7
+
+Word spaces of about 0.2 em were dropped when the merge threshold moved to 0.22 em, so captions became "Gettyimages" and "AmadeuPons". The threshold is 0.15 em. Canva's per-letter boxes still overlap, so "Recognized" does not grow a space.
+
+The Tencent wordmark is an indexed image. Opaque pixels are index 0, which is white. The lookup table was ignored, so the logo was painted black. Indexed color is applied.
+
+The mine-safety "四" disc is a shading pattern whose color function is a sample table. That table is read, and the disc is a blue gradient (both ends the same blue).
+
+A large character spacing on "()" in the KUST formula is split into separate glyphs, so the parentheses are not drawn as one pair in the middle of the expression.
+
 ## 1.3.6
 
 PowerPoint on a 25-deck corpus stayed valid and the right size, and several slides were still wrong.

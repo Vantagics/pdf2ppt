@@ -74,6 +74,34 @@ func TestRotatePageKeepsTextUpright(t *testing.T) {
 	}
 }
 
+func TestTightWordSpaceIsKept(t *testing.T) {
+	// 0.20 em is a real word space ("Getty" + "images"). A negative gap is
+	// Canva's per-letter boxes and must not grow a space.
+	p := &Page{Elements: []PageElement{
+		{Text: &TextObject{Content: "Getty", X: 70, Y: 156, Width: 44, Height: 22, FontSize: 18, FontName: "Arimo"}},
+		{Text: &TextObject{Content: "images", X: 118, Y: 156, Width: 59, Height: 22, FontSize: 18, FontName: "Arimo"}},
+		{Text: &TextObject{Content: "Recogni", X: 10, Y: 10, Width: 80, Height: 30, FontSize: 30, FontName: "Noto Sans"}},
+		{Text: &TextObject{Content: "zed", X: 88, Y: 12, Width: 40, Height: 30, FontSize: 30, FontName: "Noto Sans"}},
+	}}
+	mergeTextLines(p)
+	var got []string
+	for _, el := range p.Elements {
+		if el.Text != nil {
+			got = append(got, el.Text.Content)
+		}
+	}
+	joined := strings.Join(got, "|")
+	if !strings.Contains(joined, "Getty images") {
+		t.Fatalf("missing word space: %s", joined)
+	}
+	if strings.Contains(joined, "Recogni zed") {
+		t.Fatalf("split a word: %s", joined)
+	}
+	if !strings.Contains(joined, "Recognized") {
+		t.Fatalf("letters not joined: %s", joined)
+	}
+}
+
 func TestMergeHyphenatedLine(t *testing.T) {
 	p := &Page{Elements: []PageElement{
 		{Text: &TextObject{Content: "post", X: 62.25, Y: 242.82, Width: 198.48, Height: 22.61, FontSize: 18.73, FontName: "Noto Sans"}},

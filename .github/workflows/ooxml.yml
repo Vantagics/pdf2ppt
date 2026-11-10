@@ -18,4 +18,4 @@ jobs:
         with:
           dotnet-version: "8.0.x"
       - name: Validate generated PPTX against ECMA-376
-        run: go test ./converter ./converter/goppt ./converter/gopdf2 -count=1 -timeout 15m -run 'TestOOXML|TestTextOutline|TestMixedPageSize|TestMITSlideSize|TestDominant|TestLetterbox|TestUnmatte|TestFlatten|TestRotatePage|TestMergeHyphen|TestPDFMaker|TestZeroAlpha|TestFrame|TestTextRecall|TestChevron|TestRewriteWingdings'
+        run: go test ./converter ./converter/goppt ./converter/gopdf2 -count=1 -timeout 15m -run 'TestOOXML|TestTextOutline|TestMixedPageSize|TestMITSlideSize|TestDominant|TestLetterbox|TestUnmatte|TestFlatten|TestRotatePage|TestMergeHyphen|TestTightWordSpace|TestPDFMaker|TestZeroAlpha|TestFrame|TestTextRecall|TestChevron|TestRewriteWingdings'

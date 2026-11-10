@@ -244,7 +244,10 @@ func coalesce(ts []*TextObject) []TextRun {
 			if em < 1 {
 				em = t.FontSize
 			}
-			if gap > em*0.22 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
+			// 0.15 em is under a normal word space (~0.25 em) and above the
+			// negative gaps between Canva's per-letter boxes. 0.22 em dropped
+			// "Getty images" (gap 0.21 em) and "Amadeu Pons".
+			if gap > em*0.15 && !strings.HasSuffix(prev.Content, " ") && !strings.HasPrefix(t.Content, " ") && !cjkBoundary(prev.Content, t.Content) {
 				push(TextRun{
 					Content: " ", FontName: prev.FontName, FontSize: prev.FontSize,
 					Bold: prev.Bold, Italic: prev.Italic,

@@ -936,6 +936,28 @@ func (ip *interp) showTJ(arr []token) {
 		switch el.kind {
 		case tkStr:
 			s, adv := ip.decodeShow(el.raw)
+			// A large Tc (character spacing) is how PowerPoint spreads the
+			// parentheses of P=P+ρg(z−z) across the formula. One run would
+			// draw "()" as two adjacent glyphs.
+			if ip.gs.charSp > ip.gs.fontSize*0.35 && len([]rune(s)) > 1 {
+				if text != "" {
+					ip.emitText(text, total)
+					text, total = "", 0
+				}
+				rs := []rune(s)
+				each := adv / float64(len(rs))
+				for _, r := range rs {
+					ip.emitText(string(r), each)
+					if n := len(ip.elements); n > 0 && ip.elements[n-1].Text != nil {
+						tb := ip.elements[n-1].Text
+						// The advance includes Tc. The glyph itself is about one em.
+						if tb.Width > tb.FontSize*1.2 {
+							tb.Width = tb.FontSize * 0.6
+						}
+					}
+				}
+				continue
+			}
 			text += s
 			total += adv
 		case tkNum:
@@ -1522,6 +1544,9 @@ func shadingStops(xrd *model.XRefTable, sh types.Dict) []GradStop {
 	if !ok {
 		return nil
 	}
+	if sd, _, err := xrd.DereferenceStreamDict(o); err == nil && sd != nil && intEntry(xrd, sd.Dict, "FunctionType") == 0 {
+		return sampledGradient(sd)
+	}
 	fn, err := xrd.DereferenceDict(o)
 	if err != nil || fn == nil {
 		return nil
@@ -1568,6 +1593,41 @@ func shadingStops(xrd *model.XRefTable, sh types.Dict) []GradStop {
 		_ = pos
 	}
 	return stops
+}
+
+// sampledGradient reads a type-0 function (a table of RGB samples) as a
+// two-stop blend from the first sample to the last. PowerPoint badges such
+// as the mine-safety “四” disc are stored this way.
+func sampledGradient(sd *types.StreamDict) []GradStop {
+	if err := sd.Decode(); err != nil {
+		return nil
+	}
+	ncomp := 3
+	if rg := sd.Dict.ArrayEntry("Range"); len(rg) >= 2 {
+		ncomp = len(rg) / 2
+	}
+	if ncomp < 3 {
+		ncomp = 3
+	}
+	size := 0
+	if arr := sd.Dict.ArrayEntry("Size"); len(arr) > 0 {
+		if n, ok := objNum(nil, arr[0]); ok {
+			size = int(n)
+		}
+	}
+	if size < 2 || intEntry(nil, sd.Dict, "BitsPerSample") != 8 {
+		return nil
+	}
+	raw := sd.Content
+	if len(raw) < size*ncomp {
+		return nil
+	}
+	c0 := raw[0:ncomp]
+	c1 := raw[(size-1)*ncomp : (size-1)*ncomp+ncomp]
+	return []GradStop{
+		{0, c0[0], c0[1], c0[2]},
+		{1, c1[0], c1[1], c1[2]},
+	}
 }
 
 func rgbArray(xrd *model.XRefTable, d types.Dict, key string) *[3]uint8 {

@@ -222,24 +222,41 @@ func TestKUSTOpeningParenMatchesZ(t *testing.T) {
 		t.Fatal(err)
 	}
 	var paren, zee float64
+	var parenY float64
 	found := false
 	for _, tb := range p.TextObjects {
-		if !strings.Contains(tb.Content, "(") || !strings.Contains(tb.Content, "z") {
-			continue
+		runs := tb.Runs
+		if len(runs) == 0 {
+			runs = []TextRun{{Content: tb.Content, FontSize: tb.FontSize}}
 		}
-		for _, r := range tb.Runs {
+		for _, r := range runs {
 			trim := strings.TrimSpace(r.Content)
-			if strings.HasPrefix(trim, "(") {
+			if strings.HasPrefix(trim, "(") && tb.FontSize > 20 {
 				paren = r.FontSize
+				parenY = tb.Y
 				found = true
 			}
-			if trim == "z" {
+		}
+	}
+	if !found {
+		t.Fatal("formula parenthesis was not found")
+	}
+	for _, tb := range p.TextObjects {
+		if math.Abs(tb.Y-parenY) > 8 {
+			continue
+		}
+		runs := tb.Runs
+		if len(runs) == 0 {
+			runs = []TextRun{{Content: tb.Content, FontSize: tb.FontSize}}
+		}
+		for _, r := range runs {
+			if strings.TrimSpace(r.Content) == "z" && r.FontSize > zee {
 				zee = r.FontSize
 			}
 		}
 	}
-	if !found || zee == 0 {
-		t.Fatal("formula parenthesis was not found")
+	if zee == 0 {
+		t.Fatal("formula z was not found beside the parenthesis")
 	}
 	// Tc used to make this glyph 32 pt against a 29.8 pt z.
 	if paren > zee+0.6 {

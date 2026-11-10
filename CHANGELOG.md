@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+The Beamer title was not a heavier substitute font. xdvipdfmx paints those letters twice: a text run, then a stroked outline of each glyph, including a rectangular stem for "I". With Noto Sans in place of the embedded Trebuchet, the fill and the outline no longer sat on the same pixels, so the title looked ghosted. Those outlines are dropped when they sit inside the text run. Each run is then tracked (and, only for a large mismatch, resized) so the fallback font occupies the PDF advance instead of spilling into the next run. A TJ gap of exactly a quarter em, which xdvipdfmx uses as a word space, is a space again, so "You can now abuse fonts" is not one word. A wider gap is a second run, which keeps "155" and "8" in their own boxes. Vertical labels use a non-negative DrawingML angle; LibreOffice was ignoring the negative one and drawing them across the numbers.
+
+`TestBeamerTitleIsSingleAndFitted`, `TestWordSpaceGap`, and `TestSuppressesGlyphOutlinesInsideText` cover the doubled title, the missing spaces, and a letter outline left inside a run. `TextOverlaps` flags two runs on one baseline whose boxes intersect.
+
 ## 1.2.0
 
 PowerPoint often saves a slide background as a tiling pattern whose cell is one photo, with the pattern origin at the top of the page. The tile that covers the page is the one just below that origin. Unresolved pattern fills were painted with the default black, so a Chinese PowerPoint 2013 title (a building photo plus a gold title) came back as a black page. Those single-image tiles are now placed on the slide, clipped to the filled path.

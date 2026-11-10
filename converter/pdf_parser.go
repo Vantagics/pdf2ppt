@@ -128,6 +128,7 @@ func textFromPDF(textObj *gopdf2.TextObject) TextElement {
 		StrokeG:     textObj.StrokeG,
 		StrokeB:     textObj.StrokeB,
 		StrokeWidth: textObj.StrokeWidth,
+		Tracking:    textObj.Tracking,
 	}
 	if elem.FontName == "" {
 		elem.FontName = DefaultFontName

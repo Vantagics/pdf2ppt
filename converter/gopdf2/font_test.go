@@ -61,6 +61,16 @@ func TestWinAnsiAccent(t *testing.T) {
 	}
 }
 
+func TestWordSpaceGap(t *testing.T) {
+	// xdvipdfmx TJ -250 is exactly 0.25 em and must count as a space.
+	if !gapIsWordSpace(tjAdjust(-250, 12, 100), 12) {
+		t.Fatal("quarter-em gap should be a word space")
+	}
+	if gapIsWordSpace(tjAdjust(-40, 12, 100), 12) {
+		t.Fatal("kerning should not become a space")
+	}
+}
+
 func TestTokenizerTJ(t *testing.T) {
 	src := []byte("BT /F1 12 Tf 10 20 Td [<0102>-3<03>] TJ ET")
 	toks := tokenize(src)

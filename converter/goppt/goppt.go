@@ -50,6 +50,7 @@ type TextBox struct {
 	StrokeG     uint8
 	StrokeB     uint8
 	StrokeWidth float64 // points
+	Tracking    float64 // extra points between glyphs; negative tightens
 }
 
 // PathOp is a shape-local path command. Coordinates are EMU, y grows down.

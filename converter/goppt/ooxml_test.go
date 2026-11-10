@@ -30,4 +30,8 @@ func TestTextOutline(t *testing.T) {
 	if strings.Contains(bare, "<a:ln ") {
 		t.Fatal("plain text should not grow an outline")
 	}
+	vert := formatTextBox(&TextBox{Content: "Programs", FontName: "Noto Sans", FontSize: 12, X: 1, Y: 1, Width: 1000, Height: 400, Rotation: -90}, 4)
+	if !strings.Contains(vert, `rot="16200000"`) {
+		t.Fatalf("negative rotation was not normalized: %s", vert)
+	}
 }

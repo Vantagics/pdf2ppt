@@ -257,6 +257,13 @@ func tjAdjust(num, fontSize, hScale float64) float64 {
 	return -num / 1000 * fontSize * (hScale / 100)
 }
 
+// gapIsWordSpace reports a TJ adjustment wide enough to be a missing space.
+// Kerning stays under about 0.1 em. A real word space is 0.2–0.35 em, and
+// xdvipdfmx uses exactly 0.25 em.
+func gapIsWordSpace(adj, fontSize float64) bool {
+	return fontSize > 0 && adj >= fontSize*0.17
+}
+
 func normalizeFontName(base string) (family string, bold, italic bool) {
 	base = strings.TrimPrefix(base, "/")
 	base = subsetPrefix.ReplaceAllString(base, "")

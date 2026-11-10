@@ -78,6 +78,7 @@ func (g *PPTXGenerator) AddSlideFromContent(content *PageContent) error {
 				StrokeG:     te.StrokeG,
 				StrokeB:     te.StrokeB,
 				StrokeWidth: te.StrokeWidth,
+				Tracking:    te.Tracking,
 			}
 			if err := slide.AddTextBox(tb); err != nil {
 				log.Printf("warning: failed to add text box %d: %v", i, err)

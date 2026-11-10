@@ -42,6 +42,7 @@ type TextElement struct {
 	StrokeG     uint8   `json:"strokeG,omitempty"`
 	StrokeB     uint8   `json:"strokeB,omitempty"`
 	StrokeWidth float64 `json:"strokeWidth,omitempty"`
+	Tracking    float64 `json:"tracking,omitempty"`
 }
 
 // PathOp is one command of a vector outline. Coordinates are in points,

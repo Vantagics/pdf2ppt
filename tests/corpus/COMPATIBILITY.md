@@ -1,4 +1,30 @@
-# Compatibility notes (v1.2.0)
+# Compatibility notes (v1.2.1)
+
+v1.2.1 fixes three things the v1.2.0 SSIM table did not show:
+
+- Beamer Flip page 1. The title "THIS IS A / SAMPLE / TALK TITLE" was a filled run plus a stroked copy of each letter. It is one run now. The face is still Noto Sans, not the embedded Trebuchet, so the letters are a little heavier and tighter than the source. SSIM on that page is about 0.81.
+- Beamer Flip page 2. "You can now abuse fonts" had lost its spaces (a TJ gap of exactly 0.25 em). The spaces are back. "Marker Felt" is not installed here, so that sentence is Noto Sans rather than the marker face. "XeLaTeX" stays italic.
+- NRCS cattlemen page 2. The green-box labels were horizontal and "155" ran into "8" because the rotation was negative and the two numbers were one run. The labels are vertical again and the numbers sit in their own boxes.
+
+Pages that still differ when you look at them, after this fix:
+
+| Page | What you still see |
+| --- | --- |
+| Beamer Flip title | Noto Sans instead of Trebuchet. One title, not two. |
+| Beamer Flip page 2 | Marker Felt sentence is Noto Sans. Layout and spaces match. |
+| Beamer McGill | Theme fonts substituted. Text is intact. |
+| gzmtu title | Photo and title match. The gold title is a fill plus a stroke, which is what the PDF draws. |
+| gzmtu table | Same layout. SSIM stays near 0.67 because white and blue Chinese sit on a gradient bitmap. |
+| gzmtu callout | Arrow, pale-green bubble, and red outline are present. Callout text is a bit tighter than the source. |
+| Keynote title | Paper texture is a re-encoded JPEG. Text and the badge match. |
+| CDC OneLab title | Logo, type, and the diagonal bars match. A band SSIM dip is antialiasing. |
+| Google Slides (AutoPkg) | Pages scored stay above 0.92. |
+| PowerPoint 2016 and 365 (UAB) | Accents and pictures match. A few bullet runs sit within a point of the next word; the ink does not cross it. |
+| NRCS page 2 | Vertical labels and separated numbers match the source. |
+
+The v1.2.0 numbers below were measured before this fix.
+
+## Earlier measurements (v1.2.0)
 
 External PDFs are not in the git tree. `manifest.json` lists the URL, producer, and why the file is not committed. `fetch.py` downloads them into `tests/corpus/cache/`.
 

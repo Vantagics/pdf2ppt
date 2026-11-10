@@ -61,6 +61,9 @@ type TextObject struct {
 	StrokeOnly                bool
 	StrokeR, StrokeG, StrokeB uint8
 	StrokeWidth               float64
+	// Tracking is extra space between glyphs, in points. Negative tightens
+	// a fallback font so the run stays inside the PDF advance.
+	Tracking float64
 }
 
 // ImageObject is a raster image placed on the page.

@@ -154,7 +154,16 @@ func formatTextBox(tb *TextBox, id int) string {
 	sb.WriteString(fmt.Sprintf(`<p:sp><p:nvSpPr><p:cNvPr id="%d" name="TextBox %d"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>`, id, id))
 	rot := ""
 	if math.Abs(tb.Rotation) > 0.4 {
-		rot = fmt.Sprintf(` rot="%d"`, int64(math.Round(tb.Rotation*60000)))
+		// DrawingML rot is clockwise and LibreOffice ignores a negative value,
+		// which left vertical labels horizontal on top of the numbers.
+		deg := tb.Rotation
+		for deg < 0 {
+			deg += 360
+		}
+		for deg >= 360 {
+			deg -= 360
+		}
+		rot = fmt.Sprintf(` rot="%d"`, int64(math.Round(deg*60000)))
 	}
 	sb.WriteString(fmt.Sprintf(`<p:spPr><a:xfrm%s><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>`, rot, tb.X, tb.Y, tb.Width, tb.Height))
 	sb.WriteString(`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr>`)
@@ -167,7 +176,11 @@ func formatTextBox(tb *TextBox, id int) string {
 	if tb.StrokeOnly {
 		fill = `<a:noFill/>`
 	}
-	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s" dirty="0">%s`, lang, fontSize, b, i, fill))
+	spc := ""
+	if math.Abs(tb.Tracking) > 0.01 {
+		spc = fmt.Sprintf(` spc="%d"`, int(math.Round(tb.Tracking*100)))
+	}
+	sb.WriteString(fmt.Sprintf(`<a:r><a:rPr lang="%s" sz="%d" b="%s" i="%s"%s dirty="0">%s`, lang, fontSize, b, i, spc, fill))
 	if tb.Stroke && tb.StrokeWidth > 0.05 {
 		w := int(math.Round(tb.StrokeWidth * 12700))
 		if w < 635 {

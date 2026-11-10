@@ -3,6 +3,7 @@ package gopdf2
 import (
 	"math"
 	"strconv"
+	"strings"
 	"unicode/utf16"
 
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
@@ -333,7 +334,7 @@ func interpretPage(content []byte, res *resources, originX, originY, width, heig
 		Width:         width,
 		Height:        height,
 		HasBackground: ip.hasBg,
-		Elements:      ip.elements,
+		Elements:      suppressDuplicateGlyphOutlines(ip.elements),
 	}
 	if ip.hasBg {
 		page.BgR, page.BgG, page.BgB = ip.bg.bytes()
@@ -907,9 +908,19 @@ func (ip *interp) showTJ(arr []token) {
 			total += adv
 		case tkNum:
 			adj := tjAdjust(el.num, fontSize, ip.gs.hScale)
-			// A large positive gap is a word space encoded as a positioning
-			// adjustment rather than a space character.
-			if adj > fontSize*0.25 {
+			// xdvipdfmx writes a word space as TJ -250, which is exactly a
+			// quarter of an em. A strict greater-than missed that gap and
+			// glued "You can now abuse fonts" into one word.
+			// A much wider gap is a separate run (the "155" and "8" on the
+			// NRCS slide), not one space stretched across every letter.
+			if adj > fontSize*0.8 && text != "" {
+				ip.emitText(text, total)
+				ip.advance(adj)
+				text = ""
+				total = 0
+				continue
+			}
+			if gapIsWordSpace(adj, fontSize) && !strings.HasSuffix(text, " ") {
 				text += " "
 			}
 			total += adj
@@ -1011,12 +1022,16 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		bx += px
 		by += py
 	}
-	width := ip.pageLen(textAdv)
-	if width < eff*0.4 {
-		width = float64(len([]rune(text))) * eff * 0.55
+	pdfWidth := ip.pageLen(textAdv)
+	if pdfWidth < eff*0.4 {
+		pdfWidth = float64(len([]rune(text))) * eff * 0.55
 	}
-	// Pad so the last glyph is not clipped, without a filled box.
-	width += eff * 0.35
+	// Fit the fallback font to the PDF advance before the box is padded,
+	// so a wider substitute cannot paint into the next run.
+	family, eff, tracking := fitRun(family, bold, italic, eff, pdfWidth, text)
+	// A small right-bearing pad keeps the last glyph inside the box.
+	// It is not extra ink: tracking already pulled the glyphs to pdfWidth.
+	width := pdfWidth + math.Min(eff*0.08, 1.2)
 	// LibreOffice (and PowerPoint) put the baseline one em below the top of
 	// a zero-inset text box. Using the font ascender here drops the glyphs
 	// by (1-ascent)*size, which is several pixels on a typical slide.
@@ -1064,6 +1079,7 @@ func (ip *interp) emitText(text string, textAdv float64) {
 		StrokeG:     sg,
 		StrokeB:     sb,
 		StrokeWidth: sw,
+		Tracking:    tracking,
 	}
 	tb.ColorR, tb.ColorG, tb.ColorB = ip.gs.fill.bytes()
 	ip.seenContent = true

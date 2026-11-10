@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.3
+
+The first Hebrew bullet is a pair again, not one packed line. `בישראל 1,600,000` stays together and `60` stays in its own box on the left, which is the v1.5.1 layout. Lines with a colon still reorder: `הישראלי: מעל ל 50`, with a space after the bullet and after `BCG:`.
+
+A word boundary that was only a 0.4 pt crack now keeps about a third of an em, so `not-for-profit` and `basis` no longer touch.
+
+`undp-gender-ar` unique recall is back to 84.62%. The v1.5.2 line reorder had glued Arabic captions (`فيأعضاء`); those captions are separate `a:t` runs again. The soft-mask pictures stay. `uab-reo-m365` concatenated tokens are 1419. The drop is glued Latin words that were split, and unique recall rose, so no source word was lost.
+
 ## 1.5.2
 
 The Hebrew "50 percent" line is one paragraph in reading order. A colon is a neutral, so it stays on הישראלי, and 50 stays a European number: `איגוד האינטרנט הישראלי: מעל ל 50 אחוז…`. The name and the 1,600,000 line are unchanged.

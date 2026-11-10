@@ -223,7 +223,8 @@
       "area": 1473967810384521,
       "areaSlack": 0.02,
       "tokens": 1363,
-      "concatTokens": 1435,
+      "concatTokens": 1419,
+      "concatNote": "v1.5.3 splits genuinely glued Latin words (the 1462 to 1446 drop). Unique recall went up, so no source word was lost.",
       "sizeV140": 5023188
     },
     "uai2025-keynote": {

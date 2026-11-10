@@ -297,21 +297,38 @@ func TestHebrewReadingOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var line string
+	var numBox, sixty *TextObject
 	for _, tb := range p2.TextObjects {
-		if strings.Contains(tb.Content, "1,600,000") {
-			line = tb.Content
-			break
+		if strings.Contains(tb.Content, "1,600,000") && numBox == nil {
+			numBox = tb
+		}
+		if strings.Contains(tb.Content, "60") && !strings.Contains(tb.Content, "1,600") {
+			if sixty == nil || tb.X < sixty.X {
+				sixty = tb
+			}
 		}
 	}
-	if line == "" {
+	if numBox == nil {
 		t.Fatal("page 2 lost the 1,600,000 line")
 	}
+	line := numBox.Content
 	if strings.Index(line, "בישראל") < 0 || strings.Index(line, "בישראל") > strings.Index(line, "1,600,000") {
 		t.Fatalf("number is on the wrong side of בישראל: %q", line)
 	}
 	if strings.Contains(line, "1,600,000בישראל") {
 		t.Fatalf("number glued to בישראל: %q", line)
+	}
+	// v1.5.2 packed the whole bullet into one ~496 pt box, so 60 left the
+	// left edge. The pair is about 200 pt and 60 stays in its own box.
+	if strings.Contains(line, "גיל") || numBox.Width > 280 {
+		t.Fatalf("first bullet packed: w %.1f %q", numBox.Width, line)
+	}
+	if sixty == nil || sixty.X >= numBox.X {
+		x := -1.0
+		if sixty != nil {
+			x = sixty.X
+		}
+		t.Fatalf("60 is not left of the number: sixty x %.1f number x %.1f", x, numBox.X)
 	}
 	var bcg, fifty string
 	for _, tb := range p2.TextObjects {
@@ -337,6 +354,12 @@ func TestHebrewReadingOrder(t *testing.T) {
 	}
 	if !strings.Contains(fifty, "הישראלי:") && !strings.Contains(fifty, "הישראלי :") {
 		t.Fatalf("colon should follow הישראלי: %q", fifty)
+	}
+	if strings.Contains(fifty, "•איגוד") || strings.Contains(fifty, "•מעל") {
+		t.Fatalf("missing space after the bullet: %q", fifty)
+	}
+	if strings.Contains(bcg, "BCG:") && !strings.Contains(bcg, "BCG: ") && !strings.Contains(bcg, ": ") {
+		t.Fatalf("missing space after BCG colon: %q", bcg)
 	}
 }
 
@@ -365,6 +388,19 @@ func TestRTLLineReadingOrder(t *testing.T) {
 	}
 	if line != "• בישראל 1,600,000" && line != "בישראל 1,600,000" {
 		t.Fatalf("line %q", line)
+	}
+}
+
+func TestMergeWordGap(t *testing.T) {
+	// "not-for-profit " overlaps "basis". The visible gap has to be about
+	// one space, not the 0.4 pt crack that still reads as one word.
+	a := &TextObject{Content: "not-for-profit ", X: 100, Y: 0, Width: 80, Height: 14, FontSize: 16}
+	b := &TextObject{Content: "basis", X: 150, Y: 0, Width: 40, Height: 14, FontSize: 16}
+	p := &Page{Elements: []PageElement{{Text: a}, {Text: b}}}
+	pullBackOverlaps(p)
+	gap := b.X - (a.X + a.Width)
+	if gap < 16*0.30 {
+		t.Fatalf("word gap %.2f pt, want at least one space", gap)
 	}
 }
 

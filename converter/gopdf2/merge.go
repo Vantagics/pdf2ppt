@@ -981,7 +981,13 @@ func pullBackOverlaps(p *Page) {
 		if overlap < math.Max(em*1.2, old*0.18) && !(wordEdge && overlap > 1.2) {
 			continue
 		}
-		nw := b.X - a.X - 0.4
+		// A word boundary needs about one space of background, not a
+		// 0.4 pt crack. "not-for-profit" was touching "basis".
+		pad := 0.4
+		if wordEdge {
+			pad = math.Max(pad, em*0.33)
+		}
+		nw := b.X - a.X - pad
 		if nw < em*0.4 {
 			continue
 		}

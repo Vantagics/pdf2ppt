@@ -1,5 +1,9 @@
 # Compatibility notes
 
+## v1.5.3
+
+`he-openu-a11y` page 2 first bullet is the v1.5.1 pair (`בישראל 1,600,000`, with `60` in its own box). The 50 line stays `הישראלי: מעל ל 50`, with a space after the bullet and after `BCG:`. `canva-rotary` page 16 keeps about one space between `not-for-profit` and `basis`. `undp-gender-ar` unique recall is 84.62% again. `uab-reo-m365` concatenated tokens are 1419.
+
 ## v1.5.2
 
 `he-openu-a11y` page 2 reads `איגוד האינטרנט הישראלי: מעל ל 50`. `oicw-1996-scan` page 1 is fitted inside the slide, logo included. `canva-rotary` page 16 keeps the space between nonprofit and organizations. `wps-tutorial` page 4 reads `WPS Office`. `undp-gender-ar` page 10 body text is painted from the soft masks; that deck's size ceiling is the 10.8 MB file.

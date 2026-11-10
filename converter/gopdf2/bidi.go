@@ -117,10 +117,18 @@ func joinCloseRTLPairs(p *Page) {
 			if len(g) < 2 || !lineHasRTL(g) {
 				continue
 			}
-			p.Elements[g[0].i].Text = joinRTLReading(g)
-			for _, r := range g[1:] {
-				remove[r.i] = true
+			// A colon is a neutral that has to move with the embedding
+			// direction ("הישראלי: מעל ל 50"). Other lines stay as the
+			// v1.5.1 pairs: one box for the whole bullet packs the glyphs
+			// and pulls 60 off the left edge.
+			if lineHasColon(g) {
+				p.Elements[g[0].i].Text = joinRTLReading(g)
+				for _, r := range g[1:] {
+					remove[r.i] = true
+				}
+				continue
 			}
+			joinClosePairs(p, g, remove)
 		}
 	}
 	if len(remove) == 0 {
@@ -134,6 +142,73 @@ func joinCloseRTLPairs(p *Page) {
 		kept = append(kept, el)
 	}
 	p.Elements = kept
+}
+
+func lineHasColon(line []textRef) bool {
+	for _, r := range line {
+		if strings.Contains(r.t.Content, ":") {
+			return true
+		}
+	}
+	return false
+}
+
+// joinClosePairs joins two neighboring runs whose boxes almost touch.
+// The right-hand run comes first. A chain is not collapsed, so the rest
+// of the bullet stays at its PDF x.
+func joinClosePairs(p *Page, line []textRef, remove map[int]bool) {
+	for k := 0; k+1 < len(line); k++ {
+		if remove[line[k].i] || remove[line[k+1].i] {
+			continue
+		}
+		left, right := line[k].t, line[k+1].t
+		if !closeRTLPair(left, right) {
+			continue
+		}
+		p.Elements[line[k].i].Text = joinRTLPair(right, left)
+		remove[line[k+1].i] = true
+		line[k].t = p.Elements[line[k].i].Text
+	}
+}
+
+func closeRTLPair(left, right *TextObject) bool {
+	if !hasRTLScript(left.Content) && !hasRTLScript(right.Content) {
+		return false
+	}
+	if utf8.RuneCountInString(strings.TrimSpace(left.Content)) < 2 || utf8.RuneCountInString(strings.TrimSpace(right.Content)) < 2 {
+		return false
+	}
+	gap := right.X - (left.X + left.Width)
+	em := math.Max(left.FontSize, right.FontSize)
+	if em < 1 {
+		em = 12
+	}
+	return gap > -0.3*em && gap < 0.55*em
+}
+
+func joinRTLPair(right, left *TextObject) *TextObject {
+	out := *right
+	rs := strings.TrimSpace(right.Content)
+	ls := strings.TrimSpace(left.Content)
+	out.Content = rs + " " + ls
+	out.RTL = true
+	out.Runs = nil
+	out.holdX = true
+	if left.X < out.X {
+		out.X = left.X
+	}
+	r := right.X + right.Width
+	if left.X+left.Width > r {
+		r = left.X + left.Width
+	}
+	out.Width = r - out.X
+	if left.Y < out.Y {
+		out.Y = left.Y
+	}
+	if left.Y+left.Height > out.Y+out.Height {
+		out.Height = left.Y + left.Height - out.Y
+	}
+	return &out
 }
 
 func lineHasRTL(line []textRef) bool {
@@ -208,6 +283,11 @@ func rtlWordSeparator(right, left *TextObject) bool {
 	piece := strings.TrimSpace(left.Content)
 	if piece == "" {
 		return false
+	}
+	rightS := strings.TrimSpace(right.Content)
+	// A bullet and a colon take a following space ("• איגוד", "BCG: ישראל").
+	if rightS == "•" || strings.HasSuffix(rightS, ":") {
+		return true
 	}
 	if neutralPunct(piece) {
 		return false

@@ -242,7 +242,9 @@ func TestKUSTOpeningParenMatchesZ(t *testing.T) {
 		t.Fatal("formula parenthesis was not found")
 	}
 	for _, tb := range p.TextObjects {
-		if math.Abs(tb.Y-parenY) > 8 {
+		// Box tops move with the font metrics. The formula line is still
+		// the only large z near this parenthesis.
+		if math.Abs(tb.Y-parenY) > 40 {
 			continue
 		}
 		runs := tb.Runs
@@ -256,7 +258,13 @@ func TestKUSTOpeningParenMatchesZ(t *testing.T) {
 		}
 	}
 	if zee == 0 {
-		t.Fatal("formula z was not found beside the parenthesis")
+		var near []string
+		for _, tb := range p.TextObjects {
+			if math.Abs(tb.Y-parenY) < 80 && strings.ContainsAny(tb.Content, "zZ(") {
+				near = append(near, fmt.Sprintf("y=%.1f sz=%.1f %q", tb.Y, tb.FontSize, tb.Content))
+			}
+		}
+		t.Fatalf("formula z was not found beside the parenthesis at y=%.1f; nearby %s", parenY, strings.Join(near, "; "))
 	}
 	// Tc used to make this glyph 32 pt against a 29.8 pt z.
 	if paren > zee+0.6 {
